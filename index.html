@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIS Staff Portal — Educators Intelligence System</title>
+  <meta name="description" content="EIS Staff Portal for Mentors, Administrators, and Oversight Officers. Manage sessions, mentees, earnings and more.">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <!-- ── Toast Container ───────────────────────────────────── -->
+  <div id="toast-container"></div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       Top Navigation (Authenticated Users Only)
+  ═══════════════════════════════════════════════════════════ -->
+  <header id="main-nav" class="hidden">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="logo-text">EIS</span>
+        <span class="portal-badge">Staff Portal</span>
+      </div>
+      <nav class="nav-links">
+        <span id="user-display" class="user-info-text"></span>
+        <button id="install-pwa-btn" class="nav-btn pwa-btn hidden">
+          <i data-lucide="download"></i> Install App
+        </button>
+        <button id="logout-btn" class="nav-btn logout-btn">
+          <i data-lucide="log-out"></i> Sign Out
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════
+       VIEW: Welcome / Landing Page
+  ═══════════════════════════════════════════════════════════ -->
+  <section id="view-welcome" class="portal-view active">
+    <!-- Welcome-specific nav -->
+    <div class="welcome-nav">
+      <div class="welcome-nav-brand">
+        <span class="logo-text">EIS</span>
+        <span class="portal-badge">Staff Portal</span>
+      </div>
+      <div class="welcome-nav-actions">
+        <button class="nav-btn" id="welcome-login-btn">Sign In</button>
+        <button class="hero-primary-btn" style="padding: 9px 18px; font-size: 13px;" id="welcome-apply-btn">
+          Apply as Mentor
+        </button>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero-section">
+      <div class="hero-eyebrow">
+        <i data-lucide="shield-check" style="width:14px;height:14px;"></i>
+        Educators Intelligence System
+      </div>
+      <h1 class="hero-title">
+        The <span>Staff Portal</span> for<br>Academic Excellence
+      </h1>
+      <p class="hero-subtitle">
+        Manage your mentees, schedule sessions, track earnings, and oversee academic performance — all in one secure platform.
+      </p>
+      <div class="hero-actions">
+        <button class="hero-primary-btn" id="hero-login-btn">
+          <i data-lucide="log-in" style="width:16px;height:16px;"></i>
+          Sign In to Portal
+        </button>
+        <button class="hero-secondary-btn" id="hero-apply-btn">
+          <i data-lucide="user-plus" style="width:16px;height:16px;"></i>
+          Apply as Mentor
+        </button>
+      </div>
+    </div>
+
+    <!-- Feature strip -->
+    <div class="features-strip">
+      <div class="feature-item">
+        <div class="feature-icon-wrap"><i data-lucide="users"></i></div>
+        <div class="feature-text">
+          <strong>Mentee Management</strong>
+          <span>Assign, track & support</span>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon-wrap"><i data-lucide="calendar"></i></div>
+        <div class="feature-text">
+          <strong>Session Scheduling</strong>
+          <span>Book and manage sessions</span>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon-wrap"><i data-lucide="wallet"></i></div>
+        <div class="feature-text">
+          <strong>Earnings & Payouts</strong>
+          <span>Track wallet & request payouts</span>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon-wrap"><i data-lucide="shield"></i></div>
+        <div class="feature-text">
+          <strong>Admin Control</strong>
+          <span>Registry, keys & oversight</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       Main App Container (other views)
+  ═══════════════════════════════════════════════════════════ -->
+  <main class="view-container">
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Login
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-login" class="portal-view hidden">
+      <div class="auth-wrapper">
+        <div class="login-card">
+          <div class="login-brand">
+            <span class="logo-text">EIS</span>
+            <span class="portal-badge">Staff Portal</span>
+          </div>
+          <div class="login-header">
+            <h1>Welcome Back</h1>
+            <p>Sign in with your EIS Ticket Number and password</p>
+          </div>
+          <form id="login-form" autocomplete="on">
+            <div class="form-group">
+              <label for="login-email">EIS Ticket Number</label>
+              <div class="input-wrap">
+                <i data-lucide="hash"></i>
+                <input type="text" id="login-email" required placeholder="e.g. EIS-MT-1234" autocomplete="username">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <div class="input-wrap">
+                <i data-lucide="lock"></i>
+                <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" style="padding-right: 40px;">
+                <button type="button" class="password-toggle-btn" id="toggle-login-password" aria-label="Toggle Password Visibility">
+                  <i data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+            <div class="form-meta">
+              <button type="button" id="forgot-password-btn">Forgot password?</button>
+            </div>
+            <button type="submit" class="submit-btn" id="login-submit">
+              Sign In <i data-lucide="arrow-right"></i>
+            </button>
+          </form>
+          <div class="login-footer">
+            <p>Want to join as a mentor? <a href="#" id="go-register-btn">Apply Here</a></p>
+            <p style="margin-top:8px;"><a href="#" id="login-back-welcome">← Back to home</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Forgot Password
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-forgot-password" class="portal-view hidden">
+      <div class="auth-wrapper">
+        <div class="login-card">
+          <div class="login-brand">
+            <span class="logo-text">EIS</span>
+            <span class="portal-badge">Staff Portal</span>
+          </div>
+          <div class="login-header">
+            <h1>Reset Password</h1>
+            <p>Enter your email and we'll send you a reset link</p>
+          </div>
+          <form id="forgot-password-form">
+            <div class="form-group">
+              <label for="forgot-email">Email Address</label>
+              <div class="input-wrap">
+                <i data-lucide="mail"></i>
+                <input type="email" id="forgot-email" required placeholder="your@email.com" autocomplete="email">
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="forgot-submit">
+              Send Reset Link <i data-lucide="send"></i>
+            </button>
+          </form>
+          <div class="login-footer">
+            <p><a href="#" id="forgot-back-login">← Back to login</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Mentor Registration / Application
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-register" class="portal-view hidden">
+      <div class="auth-wrapper">
+        <div class="register-card">
+          <div class="card-header">
+            <button id="register-back-btn" class="back-link">
+              <i data-lucide="arrow-left"></i> Back to Login
+            </button>
+            <h1>Apply as a Mentor</h1>
+            <p>Fill in your details to apply — our admin team will review your application within 24–48 hours.</p>
+          </div>
+          <form id="mentor-apply-form" autocomplete="on">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="reg-name">Full Name</label>
+                <div class="input-wrap">
+                  <i data-lucide="user"></i>
+                  <input type="text" id="reg-name" required placeholder="Dr. Jane Smith" autocomplete="name">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="reg-email">Email Address</label>
+                <div class="input-wrap">
+                  <i data-lucide="mail"></i>
+                  <input type="email" id="reg-email" required placeholder="jane@example.com" autocomplete="email">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="reg-password">Create Password</label>
+                <div class="input-wrap">
+                  <i data-lucide="lock"></i>
+                  <input type="password" id="reg-password" required placeholder="Min. 6 characters" autocomplete="new-password" style="padding-right: 40px;">
+                  <button type="button" class="password-toggle-btn" id="toggle-reg-password" aria-label="Toggle Password Visibility">
+                    <i data-lucide="eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="reg-phone">Phone Number</label>
+                <div class="input-wrap">
+                  <i data-lucide="phone"></i>
+                  <input type="text" id="reg-phone" placeholder="+27 XX XXX XXXX">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-subjects">Subjects (comma-separated)</label>
+              <div class="input-wrap">
+                <i data-lucide="book-open"></i>
+                <input type="text" id="reg-subjects" required placeholder="e.g. Mathematics, Physics, Chemistry">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-qualification">Highest Qualification</label>
+              <div class="input-wrap">
+                <i data-lucide="graduation-cap"></i>
+                <input type="text" id="reg-qualification" placeholder="e.g. BSc Mathematics (University of Cape Town)">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-bio">Mentoring Experience & Background</label>
+              <textarea id="reg-bio" rows="4" required placeholder="Describe your teaching experience, qualifications, and why you want to mentor with EIS..."></textarea>
+            </div>
+            <button type="submit" class="submit-btn" id="register-submit">
+              Submit Application <i data-lucide="check"></i>
+            </button>
+          </form>
+          <div class="login-footer" style="margin-top:16px;">
+            <p>Already approved? <a href="#" id="reg-go-login">Sign In</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Mentor Dashboard
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-mentor-dashboard" class="portal-view hidden">
+      <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="dashboard-sidebar">
+          <div class="mentor-profile-info">
+            <div class="profile-avatar" id="mentor-avatar">M</div>
+            <h3 id="mentor-name-display">Mentor Name</h3>
+            <span class="status-pill active-pill" id="mentor-status-tag">ACTIVE</span>
+          </div>
+          <ul class="sidebar-menu">
+            <li class="menu-item active" data-tab="mentor-overview"><i data-lucide="layout-dashboard"></i> Overview</li>
+            <li class="menu-item" data-tab="mentor-mentees"><i data-lucide="users"></i> My Mentees</li>
+            <li class="menu-item" data-tab="mentor-schedule"><i data-lucide="calendar"></i> Schedule</li>
+            <li class="menu-item" data-tab="mentor-wallet"><i data-lucide="wallet"></i> Wallet</li>
+            <li class="menu-item" data-tab="mentor-download"><i data-lucide="smartphone"></i> Download App</li>
+          </ul>
+        </aside>
+
+        <!-- Content -->
+        <div class="dashboard-content">
+          <!-- Overview -->
+          <div id="mentor-tab-overview" class="subtab-content active">
+            <h2 class="page-title">Mentor Workspace</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-label">Total Mentees</span>
+                <span class="stat-val" id="m-stat-mentees">—</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Sessions Held</span>
+                <span class="stat-val" id="m-stat-sessions">—</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Wallet Balance</span>
+                <span class="stat-val text-primary" id="m-stat-balance">—</span>
+              </div>
+            </div>
+            <div class="section-title">Upcoming Sessions</div>
+            <div class="session-list" id="mentor-sessions-list">
+              <p class="empty-msg">No sessions scheduled yet.</p>
+            </div>
+          </div>
+
+          <!-- Mentees -->
+          <div id="mentor-tab-mentees" class="subtab-content hidden">
+            <h2 class="page-title">My Mentees</h2>
+            <div class="mentee-grid" id="mentor-mentee-list">
+              <p class="empty-msg">No mentees assigned yet.</p>
+            </div>
+          </div>
+
+          <!-- Schedule -->
+          <div id="mentor-tab-schedule" class="subtab-content hidden">
+            <h2 class="page-title">Schedule a Session</h2>
+            <div class="card padding-lg">
+              <h3>New Academic Session</h3>
+              <form id="mentor-schedule-form" class="margin-top-md">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="sched-mentee">Student</label>
+                    <select id="sched-mentee" required class="form-select">
+                      <option value="">Select student...</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="sched-date">Date</label>
+                    <input type="date" id="sched-date" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="sched-time">Time</label>
+                    <input type="time" id="sched-time" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="sched-duration">Duration (minutes)</label>
+                    <input type="number" id="sched-duration" value="60" min="15" max="180" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="sched-topic">Topic / Subject</label>
+                  <div class="input-wrap">
+                    <i data-lucide="book-open"></i>
+                    <input type="text" id="sched-topic" required placeholder="e.g. Calculus — Integration by Parts">
+                  </div>
+                </div>
+                <button type="submit" class="submit-btn max-w-sm">
+                  <i data-lucide="calendar-plus"></i> Create Session
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Wallet -->
+          <div id="mentor-tab-wallet" class="subtab-content hidden">
+            <h2 class="page-title">Earnings & Finance</h2>
+            <div class="stats-grid max-w-lg">
+              <div class="stat-card">
+                <span class="stat-label">Available Balance</span>
+                <span class="stat-val text-primary" id="mentor-wallet-balance">$0.00</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Total Withdrawn</span>
+                <span class="stat-val" id="mentor-wallet-withdrawn">$0.00</span>
+              </div>
+            </div>
+            <div class="card padding-lg margin-top-lg">
+              <h3>Request Payout</h3>
+              <p class="font-sm text-secondary margin-bottom-md" style="margin-top:4px;">Bank transfer processed within 24 hours.</p>
+              <form id="mentor-payout-form">
+                <div class="form-group">
+                  <label for="payout-amount">Amount (R)</label>
+                  <input type="number" id="payout-amount" min="1" step="any" required placeholder="0.00">
+                </div>
+                <button type="submit" class="submit-btn max-w-sm">
+                  <i data-lucide="send"></i> Submit Payout Request
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Download App -->
+          <div id="mentor-tab-download" class="subtab-content hidden">
+            <h2 class="page-title">EIS Student App</h2>
+            <div class="download-container">
+              <i data-lucide="smartphone" class="huge-icon"></i>
+              <div class="download-info">
+                <h3>EIS Mobile Client v3.0</h3>
+                <p class="text-secondary margin-bottom-lg">Share this APK with your students to give them access to sessions, their portfolio, and class materials.</p>
+                <a href="/downloads/eis-client-v3.apk" download class="download-btn">
+                  <i data-lucide="download-cloud"></i> Download Android APK
+                </a>
+                <p class="font-xs text-secondary margin-top-sm">~24.8 MB · Android 8.0+</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Admin Dashboard
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-admin-dashboard" class="portal-view hidden">
+      <div class="dashboard-layout">
+        <aside class="dashboard-sidebar">
+          <div class="mentor-profile-info">
+            <div class="profile-avatar admin-avatar"><i data-lucide="shield"></i></div>
+            <h3 id="admin-name-display">Administrator</h3>
+            <span class="status-pill admin-pill">SYSTEM ADMIN</span>
+          </div>
+          <ul class="sidebar-menu">
+            <li class="menu-item active" data-tab="admin-users"><i data-lucide="users"></i> Registry</li>
+            <li class="menu-item" data-tab="admin-applications"><i data-lucide="file-check"></i> Applications</li>
+            <li class="menu-item" data-tab="admin-apikeys"><i data-lucide="key"></i> API Keys</li>
+          </ul>
+        </aside>
+
+        <div class="dashboard-content">
+          <!-- Registry -->
+          <div id="admin-tab-users" class="subtab-content active">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">System Registry</h2>
+              <button class="submit-btn max-w-xs" id="admin-refresh-registry-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>All Users</h3>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-users-table">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Applications -->
+          <div id="admin-tab-applications" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Mentor Applications</h2>
+              <button class="submit-btn max-w-xs" id="admin-refresh-apps-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="applications-container" id="admin-applications-list">
+              <p class="empty-msg">No pending applications.</p>
+            </div>
+          </div>
+
+          <!-- API Keys -->
+          <div id="admin-tab-apikeys" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">API Keys</h2>
+              <button class="submit-btn max-w-xs" id="admin-new-key-btn">
+                <i data-lucide="plus"></i> Generate Key
+              </button>
+            </div>
+            <div class="info-banner">
+              <i data-lucide="info"></i>
+              <div class="info-banner-text">
+                <strong>API Keys</strong> allow third-party integrations to securely connect with the EIS database. Treat them like passwords.
+              </div>
+            </div>
+            <!-- Key form -->
+            <div id="admin-key-generator-box" class="card padding-lg margin-bottom-lg hidden">
+              <h3>Generate New Key</h3>
+              <form id="admin-key-form" class="margin-top-md">
+                <div class="form-group">
+                  <label for="key-name">Integration / Application Name</label>
+                  <div class="input-wrap">
+                    <i data-lucide="tag"></i>
+                    <input type="text" id="key-name" required placeholder="e.g. Analytics Dashboard">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Permissions</label>
+                  <div class="checkbox-group">
+                    <label><input type="checkbox" id="key-perm-read" checked> Read Access</label>
+                    <label><input type="checkbox" id="key-perm-write"> Write / Modify Access</label>
+                    <label><input type="checkbox" id="key-perm-admin"> Admin Commands</label>
+                  </div>
+                </div>
+                <div class="btn-group">
+                  <button type="submit" class="submit-btn max-w-xs">Create Key</button>
+                  <button type="button" class="cancel-btn max-w-xs" id="admin-key-cancel">Cancel</button>
+                </div>
+              </form>
+            </div>
+            <!-- Keys table -->
+            <div class="card padding-lg">
+              <h3>Active Credentials</h3>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Created</th>
+                      <th>Permissions</th>
+                      <th>Token</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-apikeys-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────
+         VIEW: Matshwane Portal
+    ───────────────────────────────────────────────────────── -->
+    <section id="view-matshwane-portal" class="portal-view hidden">
+      <div class="dashboard-layout">
+        <aside class="dashboard-sidebar">
+          <div class="mentor-profile-info">
+            <div class="profile-avatar matshwane-avatar"><i data-lucide="eye"></i></div>
+            <h3>Matshwane Admin</h3>
+            <span class="status-pill matshwane-pill">OVERSIGHT</span>
+          </div>
+          <ul class="sidebar-menu">
+            <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="activity"></i> Oversight</li>
+            <li class="menu-item" data-tab="matshwane-audits"><i data-lucide="clipboard-list"></i> Audit Logs</li>
+          </ul>
+        </aside>
+
+        <div class="dashboard-content">
+          <!-- Oversight -->
+          <div id="matshwane-tab-oversight" class="subtab-content active">
+            <h2 class="page-title">Child Protection & Oversight</h2>
+            <div class="card padding-lg">
+              <h3>Disciplinary Reports</h3>
+              <div class="reports-list" id="matshwane-reports-list">
+                <p class="empty-msg">No active disciplinary reports.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit Logs -->
+          <div id="matshwane-tab-audits" class="subtab-content hidden">
+            <h2 class="page-title">System Audit Logs</h2>
+            <div class="card padding-lg">
+              <h3>Security Audit Trail</h3>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>IP / Source</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matshwane-audits-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main><!-- /.view-container -->
+
+  <script src="app.js?v=5.0.1"></script>
+</body>
+</html>
