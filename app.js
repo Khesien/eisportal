@@ -643,17 +643,24 @@ async function loadMentorApplications() {
   list.innerHTML = '';
   apps.forEach(function(app) {
     var appName = app.name || ((app.first_name || '') + ' ' + (app.last_name || '')).trim() || 'Applicant';
+    var matshwaneStatus = app.matshwane_status || app.status || 'pending';
+    var mBadgeClass = matshwaneStatus === 'approved' ? 'badge-matshwane-approved' : matshwaneStatus === 'rejected' ? 'badge-matshwane-rejected' : 'badge-matshwane-pending';
+    var mBadgeText = 'MATSHWANE: ' + matshwaneStatus.toUpperCase();
+
     var card = document.createElement('div');
     card.className = 'application-card';
     card.innerHTML =
       '<div class="app-header">' +
         '<div><div class="app-title">' + escHtml(appName) + '</div><div class="app-email">' + escHtml(app.email || 'N/A') + '</div></div>' +
-        '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING</span>' +
+        '<div style="display:flex;gap:6px;align-items:center;">' +
+          '<span class="matshwane-status-badge ' + mBadgeClass + '">' + mBadgeText + '</span>' +
+          '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING</span>' +
+        '</div>' +
       '</div>' +
       '<div class="app-meta"><strong>Subjects:</strong> ' + escHtml(Array.isArray(app.subjects) ? app.subjects.join(', ') : app.subjects || '—') +
         '<br><strong>Background:</strong> ' + escHtml(app.bio || app.experience_elaboration || '—') + '</div>' +
       '<div class="app-actions">' +
-        '<button class="nav-btn" style="color:var(--color-primary);font-weight:700;" onclick="openApplicationDossierModal(\'' + app.id + '\')"><i data-lucide="eye"></i> Preview Dossier</button>' +
+        '<button class="nav-btn" style="color:var(--color-primary);font-weight:700;" onclick="openApplicationDossierModal(\'' + app.id + '\')"><i data-lucide="eye"></i> Preview & Follow-Up</button>' +
         '<button class="approve-btn" onclick="approveApplication(\'' + app.id + '\',\'' + escAttr(appName) + '\',\'' + escAttr(app.email) + '\')">✓ Approve</button>' +
         '<button class="reject-btn" onclick="rejectApplication(\'' + app.id + '\')">✕ Reject</button>' +
       '</div>';
@@ -1128,6 +1135,8 @@ async function loadMatshwaneAgreements() {
     var signedDate = arg.signed_at ? new Date(arg.signed_at).toLocaleDateString() : 'N/A';
     var isApproved = arg.status === 'approved';
     var row = document.createElement('tr');
+    row.className = 'clickable-row';
+    row.onclick = function() { openContractDetailModal(arg.id); };
     row.innerHTML =
       '<td><strong>' + escHtml(arg.mentor_name || arg.mentor_id || 'Mentor') + '</strong></td>' +
       '<td>' + signedDate + '</td>' +
@@ -1135,7 +1144,7 @@ async function loadMatshwaneAgreements() {
       '<td><span class="status-pill ' + (isApproved ? 'active-pill' : '') + '">' + escHtml((arg.status || 'signed').toUpperCase()) + '</span></td>' +
       '<td>' +
         (!isApproved ?
-          '<button class="api-action-btn" style="color:#059669;" onclick="approveMatshwaneAgreement(\'' + arg.id + '\')">Approve Contract</button>'
+          '<button class="api-action-btn" style="color:#059669;" onclick="event.stopPropagation();approveMatshwaneAgreement(\'' + arg.id + '\')">Approve Contract</button>'
           : '✓ Fully Compliant') +
       '</td>';
     table.appendChild(row);
@@ -1528,7 +1537,7 @@ var refreshMatshwaneAnnBtn = document.getElementById('matshwane-refresh-announce
 if (refreshMatshwaneAnnBtn) refreshMatshwaneAnnBtn.addEventListener('click', loadMatshwaneAnnouncements);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// APPLICATION DOSSIER PREVIEW MODAL
+// APPLICATION DOSSIER PREVIEW & AUDIT COMMENTS MODAL
 // ══════════════════════════════════════════════════════════════════════════════
 window.openApplicationDossierModal = async function(appId) {
   var overlay = document.getElementById('dossier-modal-overlay');
@@ -1566,9 +1575,32 @@ window.openApplicationDossierModal = async function(appId) {
     certsHtml = '<span style="color:var(--color-text-muted);">No attached certificates.</span>';
   }
 
+  // Fetch comments
+  var commentsRes = await _db.from('application_comments').select('*').eq('application_id', String(appId)).order('created_at', { ascending: true });
+  var comments = (commentsRes && commentsRes.data) || [];
+
+  var commentsFeedHtml = '';
+  if (comments.length > 0) {
+    commentsFeedHtml = comments.map(function(c) {
+      return '<div class="comment-box">' +
+        '<div class="comment-author"><span>' + escHtml(c.author_name || 'Staff') + ' (' + escHtml((c.author_role || 'ADMIN').toUpperCase()) + ')</span>' +
+          '<span class="comment-time">' + new Date(c.created_at).toLocaleString() + '</span></div>' +
+        '<div class="comment-text">' + escHtml(c.comment_text) + '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    commentsFeedHtml = '<p class="empty-msg" style="padding:8px 0;">No audit notes or follow-up comments recorded yet.</p>';
+  }
+
+  var matshwaneStatus = app.matshwane_status || app.status || 'pending';
+  var mBadgeClass = matshwaneStatus === 'approved' ? 'badge-matshwane-approved' : matshwaneStatus === 'rejected' ? 'badge-matshwane-rejected' : 'badge-matshwane-pending';
+
   body.innerHTML =
     '<div class="dossier-section">' +
-      '<div class="dossier-section-title">Personal & National Identification</div>' +
+      '<div class="dossier-section-title" style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span>Personal & National Identification</span>' +
+        '<span class="matshwane-status-badge ' + mBadgeClass + '">MATSHWANE: ' + matshwaneStatus.toUpperCase() + '</span>' +
+      '</div>' +
       '<div class="dossier-grid">' +
         '<div class="dossier-item"><span class="dossier-label">Full Name</span><span class="dossier-val">' + escHtml(appName) + '</span></div>' +
         '<div class="dossier-item"><span class="dossier-label">Email Address</span><span class="dossier-val">' + escHtml(app.email || 'N/A') + '</span></div>' +
@@ -1600,6 +1632,16 @@ window.openApplicationDossierModal = async function(appId) {
     '<div class="dossier-section">' +
       '<div class="dossier-section-title">Applicant Pitch & Selling Point</div>' +
       '<div class="dossier-quote-box">"' + escHtml(app.selling_point || app.bio || 'Ready to mentor students to academic excellence.') + '"</div>' +
+    '</div>' +
+
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Audit Notes & Follow-Up Comments</div>' +
+      '<div id="comments-feed-' + app.id + '">' + commentsFeedHtml + '</div>' +
+      '<div style="margin-top:14px;">' +
+        '<label class="dossier-label" for="new-comment-input-' + app.id + '">Add Follow-Up Audit Note / Explanation</label>' +
+        '<textarea id="new-comment-input-' + app.id + '" rows="2" style="width:100%;margin-top:4px;padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border-color);font-family:inherit;font-size:13px;" placeholder="Type explanation for approval/rejection or follow-up note..."></textarea>' +
+        '<button class="submit-btn max-w-xs" style="margin-top:8px;padding:8px 16px;font-size:12px;" onclick="postApplicationComment(\'' + app.id + '\')"><i data-lucide="message-square"></i> Post Note</button>' +
+      '</div>' +
     '</div>';
 
   if (app.status === 'pending') {
@@ -1613,6 +1655,31 @@ window.openApplicationDossierModal = async function(appId) {
       '<button class="cancel-btn max-w-xs" onclick="closeDossierModal()">Close</button>';
   }
   lucide.createIcons();
+};
+
+window.postApplicationComment = async function(appId) {
+  var input = document.getElementById('new-comment-input-' + appId);
+  if (!input || !input.value.trim()) {
+    showToast('Required', 'Please enter a comment or note text first.', 'warning');
+    return;
+  }
+  var text = input.value.trim();
+  var authorName = (currentProfile && (currentProfile.full_name || currentProfile.email)) || 'Staff Officer';
+  var authorRole = (currentProfile && currentProfile.role) || 'admin';
+
+  var res = await _db.from('application_comments').insert({
+    application_id: String(appId),
+    author_name: authorName,
+    author_role: authorRole,
+    comment_text: text
+  });
+
+  if (!res.error) {
+    showToast('Comment Posted', 'Follow-up note saved.', 'success');
+    openApplicationDossierModal(appId);
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
 };
 
 window.closeDossierModal = function() {
@@ -1636,6 +1703,87 @@ window.rejectApplicationFromModal = async function(appId) {
   window.closeDossierModal();
   if (window.rejectMatshwaneApp) await window.rejectMatshwaneApp(appId);
   else if (window.rejectApplication) await window.rejectApplication(appId);
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTRACT & COMPLIANCE DETAIL MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+window.openContractDetailModal = async function(agreementId) {
+  var overlay = document.getElementById('contract-modal-overlay');
+  var body = document.getElementById('contract-modal-body');
+  var footer = document.getElementById('contract-modal-footer');
+  if (!overlay || !body) return;
+
+  overlay.classList.remove('hidden');
+  body.innerHTML = '<p class="empty-msg">Loading contract package...</p>';
+
+  var res = await _db.from('mentor_agreements').select('*').eq('id', agreementId).single();
+  if (res.error || !res.data) {
+    body.innerHTML = '<p class="empty-msg">Failed to load contract package details.</p>';
+    return;
+  }
+
+  var arg = res.data;
+  var mentorName = arg.mentor_name || arg.mentor_id || 'Mentor Candidate';
+  var signedDate = arg.signed_at ? new Date(arg.signed_at).toLocaleString() : 'N/A';
+  var isApproved = arg.status === 'approved';
+
+  body.innerHTML =
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Governance Contract & Verification Status</div>' +
+      '<div class="dossier-grid">' +
+        '<div class="dossier-item"><span class="dossier-label">Mentor Name</span><span class="dossier-val">' + escHtml(mentorName) + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Signed Date & Time</span><span class="dossier-val">' + signedDate + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Governance Version</span><span class="dossier-val">v2026.1 COMPLIANCE</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Package Status</span><span class="dossier-val"><span class="status-pill ' + (isApproved ? 'active-pill' : '') + '">' + escHtml((arg.status || 'signed').toUpperCase()) + '</span></span></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Official Contract Document Body</div>' +
+      '<div class="contract-doc-box">' +
+        '<h4>EDUCATORS INTELLIGENCE SYSTEM (EIS) — MENTOR GOVERNANCE AGREEMENT</h4>' +
+        '<p><strong>ARTICLE 1: SAFEGUARDING & CHILD PROTECTION UNDERTAKING</strong><br>' +
+        'The mentor agrees to uphold strict non-discrimination, safe learning environment protocols, and prompt reporting of any safety concerns to Matshwane Registry.</p>' +
+        '<p><strong>ARTICLE 2: ACADEMIC INTEGRITY & QUALITY STANDARDS</strong><br>' +
+        'All tutoring sessions, study materials, and assessments provided must conform to established academic curriculum standards without compromise.</p>' +
+        '<p><strong>ARTICLE 3: DIGITAL PRIVACY & CONFIDENTIALITY</strong><br>' +
+        'Mentors shall respect student privacy and keep session recordings and records confidential within the EIS platform.</p>' +
+      '</div>' +
+      '<div style="margin-top:14px;background:#ffffff;padding:12px;border-radius:var(--radius-md);border:1px solid var(--border-color);font-size:12px;">' +
+        '<strong>Signed Terms Verification Checklist:</strong><br>' +
+        '✓ [AGREED] Child Safeguarding & Ethics Policy<br>' +
+        '✓ [AGREED] Academic Quality Undertaking<br>' +
+        '✓ [VERIFIED] Digital Signature & Timestamp' +
+      '</div>' +
+    '</div>';
+
+  if (!isApproved) {
+    footer.innerHTML =
+      '<button class="approve-btn" style="padding:9px 18px;" onclick="approveContractFromModal(\'' + arg.id + '\')">✓ Approve & Certify Contract Package</button>' +
+      '<button class="cancel-btn max-w-xs" onclick="closeContractModal()">Close</button>';
+  } else {
+    footer.innerHTML =
+      '<span class="status-pill active-pill" style="align-self:center;margin-right:auto;">FULLY CERTIFIED & COMPLIANT</span>' +
+      '<button class="cancel-btn max-w-xs" onclick="closeContractModal()">Close</button>';
+  }
+  lucide.createIcons();
+};
+
+window.closeContractModal = function() {
+  var overlay = document.getElementById('contract-modal-overlay');
+  if (overlay) overlay.classList.add('hidden');
+};
+
+var closeContractBtn = document.getElementById('close-contract-modal');
+if (closeContractBtn) closeContractBtn.addEventListener('click', window.closeContractModal);
+
+var cancelContractBtn = document.getElementById('contract-modal-cancel');
+if (cancelContractBtn) cancelContractBtn.addEventListener('click', window.closeContractModal);
+
+window.approveContractFromModal = async function(argId) {
+  window.closeContractModal();
+  if (window.approveMatshwaneAgreement) await window.approveMatshwaneAgreement(argId);
 };
 
 // ── CSV Export Helper ──

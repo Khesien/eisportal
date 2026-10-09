@@ -1536,3 +1536,64 @@ textarea {
   gap: 12px;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   COMMENTS & CONTRACT DOCUMENT VIEWER
+═══════════════════════════════════════════════════════════ */
+.comment-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.comment-author {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.comment-time {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+.comment-text {
+  font-size: 13px;
+  color: var(--color-text);
+  margin-top: 4px;
+}
+
+.contract-doc-box {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  font-family: inherit;
+  line-height: 1.8;
+  font-size: 13px;
+  color: var(--color-text);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.clickable-row:hover {
+  background: var(--color-primary-light) !important;
+}
+
+.matshwane-status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+.badge-matshwane-approved { background: #d1fae5; color: #059669; }
+.badge-matshwane-rejected { background: #fee2e2; color: #dc2626; }
+.badge-matshwane-pending  { background: #fef3c7; color: #d97706; }
+
