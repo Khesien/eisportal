@@ -454,6 +454,9 @@
             <li class="menu-item active" data-tab="admin-users"><i data-lucide="users"></i> Registry</li>
             <li class="menu-item" data-tab="admin-applications"><i data-lucide="file-check"></i> Applications</li>
             <li class="menu-item" data-tab="admin-apikeys"><i data-lucide="key"></i> API Keys</li>
+            <li class="menu-item" data-tab="admin-matching"><i data-lucide="git-pull-request"></i> Mentor Matching</li>
+            <li class="menu-item" data-tab="admin-sessions"><i data-lucide="video"></i> Live Overseer</li>
+            <li class="menu-item" data-tab="admin-announcements"><i data-lucide="megaphone"></i> Broadcasts</li>
           </ul>
         </aside>
 
@@ -467,8 +470,8 @@
               </button>
             </div>
             <div class="card padding-lg">
-              <h3>All Users</h3>
-              <div class="table-wrap">
+              <h3>All Registered Accounts</h3>
+              <div class="table-wrap" style="margin-top:16px;">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -558,6 +561,98 @@
               </div>
             </div>
           </div>
+
+          <!-- Mentor Matching Requests Queue -->
+          <div id="admin-tab-matching" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Mentor Matching Requests</h2>
+              <button class="submit-btn max-w-xs" id="admin-refresh-matching-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>Mentee Matching & Reassignment Queue</h3>
+              <div class="table-wrap" style="margin-top:16px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Requested Mentor</th>
+                      <th>Reason Submitted</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-matching-table">
+                    <tr><td colspan="5" class="empty-msg">Loading requests...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Overseer & Session Monitoring -->
+          <div id="admin-tab-sessions" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Live Overseer & Sessions</h2>
+              <button class="submit-btn max-w-xs" id="admin-refresh-sessions-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>Active & Scheduled Academic Sessions</h3>
+              <div class="reports-list" id="admin-sessions-list" style="margin-top:16px;">
+                <p class="empty-msg">No active sessions found.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Broadcast Announcements -->
+          <div id="admin-tab-announcements" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">System Broadcasts & Directives</h2>
+              <button class="submit-btn max-w-xs" id="admin-refresh-announcements-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+
+            <!-- Create Announcement Card -->
+            <div class="card padding-lg margin-bottom-lg">
+              <h3>Post System Announcement</h3>
+              <form id="admin-announcement-form" class="margin-top-md">
+                <div class="form-group">
+                  <label for="announcement-title">Announcement Title</label>
+                  <div class="input-wrap">
+                    <i data-lucide="type"></i>
+                    <input type="text" id="announcement-title" required placeholder="e.g. End of Term Examination Schedule">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="announcement-role">Target Audience</label>
+                  <select id="announcement-role" class="form-control" style="width:100%;padding:10px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                    <option value="all">All System Users (Staff, Mentors & Students)</option>
+                    <option value="mentor">Mentors Only</option>
+                    <option value="student">Students Only</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="announcement-content">Message Content</label>
+                  <textarea id="announcement-content" rows="4" required style="width:100%;padding:12px;border-radius:var(--radius-md);border:1px solid var(--border-color);font-family:inherit;" placeholder="Write broadcast message..."></textarea>
+                </div>
+                <button type="submit" class="submit-btn max-w-xs">
+                  <i data-lucide="send"></i> Post Broadcast
+                </button>
+              </form>
+            </div>
+
+            <!-- Published Announcements List -->
+            <div class="card padding-lg">
+              <h3>Active System Broadcast Feed</h3>
+              <div id="admin-announcements-feed" style="margin-top:16px;">
+                <p class="empty-msg">No announcements posted yet.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -576,8 +671,10 @@
           <ul class="sidebar-menu">
             <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="shield-alert"></i> Oversight & Safety</li>
             <li class="menu-item" data-tab="matshwane-roster"><i data-lucide="user-check"></i> Applications & Roster</li>
+            <li class="menu-item" data-tab="matshwane-status"><i data-lucide="activity"></i> Academic Standing</li>
             <li class="menu-item" data-tab="matshwane-education"><i data-lucide="award"></i> Academic Verification</li>
             <li class="menu-item" data-tab="matshwane-agreements"><i data-lucide="file-signature"></i> Contracts & Compliance</li>
+            <li class="menu-item" data-tab="matshwane-announcements"><i data-lucide="megaphone"></i> Directives</li>
             <li class="menu-item" data-tab="matshwane-audits"><i data-lucide="clipboard-list"></i> Audit Logs</li>
           </ul>
         </aside>
@@ -645,6 +742,36 @@
             </div>
           </div>
 
+          <!-- Student Academic Standing & Action Plans -->
+          <div id="matshwane-tab-status" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Student Standing & Action Plans</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-status-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>Student Academic Status Controls</h3>
+              <div class="table-wrap" style="margin-top:16px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Email</th>
+                      <th>Academic Level</th>
+                      <th>Standing</th>
+                      <th>Milestone Flag</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matshwane-status-table">
+                    <tr><td colspan="6" class="empty-msg">Loading student standing data...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Academic Records Verification -->
           <div id="matshwane-tab-education" class="subtab-content hidden">
             <div class="view-header">
@@ -701,6 +828,44 @@
                     <tr><td colspan="5" class="empty-msg">Loading...</td></tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Matshwane Directives & Notices -->
+          <div id="matshwane-tab-announcements" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Matshwane Governance Directives</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-announcements-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+
+            <!-- Post Notice -->
+            <div class="card padding-lg margin-bottom-lg">
+              <h3>Post Official Governance Notice</h3>
+              <form id="matshwane-announcement-form" class="margin-top-md">
+                <div class="form-group">
+                  <label for="matshwane-ann-title">Notice Title</label>
+                  <div class="input-wrap">
+                    <i data-lucide="file-text"></i>
+                    <input type="text" id="matshwane-ann-title" required placeholder="e.g. Mandatory Child Safeguarding Compliance Update">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="matshwane-ann-content">Directive Content</label>
+                  <textarea id="matshwane-ann-content" rows="4" required style="width:100%;padding:12px;border-radius:var(--radius-md);border:1px solid var(--border-color);font-family:inherit;" placeholder="Write directive text..."></textarea>
+                </div>
+                <button type="submit" class="submit-btn max-w-xs">
+                  <i data-lucide="send"></i> Issue Directive
+                </button>
+              </form>
+            </div>
+
+            <div class="card padding-lg">
+              <h3>Active Governance Feed</h3>
+              <div id="matshwane-announcements-feed" style="margin-top:16px;">
+                <p class="empty-msg">No compliance directives published yet.</p>
               </div>
             </div>
           </div>

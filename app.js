@@ -106,8 +106,11 @@ function initSubtabNavigation(sectionSelector) {
         'mentor-schedule':'mentor-tab-schedule', 'mentor-wallet':'mentor-tab-wallet',
         'mentor-download':'mentor-tab-download', 'admin-users':'admin-tab-users',
         'admin-applications':'admin-tab-applications', 'admin-apikeys':'admin-tab-apikeys',
+        'admin-matching':'admin-tab-matching', 'admin-sessions':'admin-tab-sessions',
+        'admin-announcements':'admin-tab-announcements',
         'matshwane-oversight':'matshwane-tab-oversight', 'matshwane-roster':'matshwane-tab-roster',
-        'matshwane-education':'matshwane-tab-education', 'matshwane-agreements':'matshwane-tab-agreements',
+        'matshwane-status':'matshwane-tab-status', 'matshwane-education':'matshwane-tab-education',
+        'matshwane-agreements':'matshwane-tab-agreements', 'matshwane-announcements':'matshwane-tab-announcements',
         'matshwane-audits':'matshwane-tab-audits',
       };
       var targetEl = container.querySelector('#' + (idMap[tabId] || tabId));
@@ -116,9 +119,12 @@ function initSubtabNavigation(sectionSelector) {
         'mentor-overview': loadMentorOverview, 'mentor-mentees': loadMentorMentees,
         'mentor-schedule': loadMentorMenteesDropdown, 'mentor-wallet': loadMentorWallet,
         'admin-users': loadAdminRegistry, 'admin-applications': loadMentorApplications,
-        'admin-apikeys': loadAdminApiKeys, 'matshwane-oversight': loadMatshwaneOversight,
-        'matshwane-roster': loadMatshwaneRoster, 'matshwane-education': loadMatshwaneEducation,
-        'matshwane-agreements': loadMatshwaneAgreements, 'matshwane-audits': loadMatshwaneAudits,
+        'admin-apikeys': loadAdminApiKeys, 'admin-matching': loadAdminMatching,
+        'admin-sessions': loadAdminSessions, 'admin-announcements': loadAdminAnnouncements,
+        'matshwane-oversight': loadMatshwaneOversight, 'matshwane-roster': loadMatshwaneRoster,
+        'matshwane-status': loadMatshwaneStatus, 'matshwane-education': loadMatshwaneEducation,
+        'matshwane-agreements': loadMatshwaneAgreements, 'matshwane-announcements': loadMatshwaneAnnouncements,
+        'matshwane-audits': loadMatshwaneAudits,
       };
       if (loaders[tabId]) loaders[tabId]();
     });
@@ -1181,6 +1187,341 @@ async function loadMatshwaneAudits() {
     table.appendChild(row);
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADMIN EXTENDED LOADERS — MATCHING, SESSIONS, ANNOUNCEMENTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Admin Mentor Matching Requests ──
+async function loadAdminMatching() {
+  var table = document.getElementById('admin-matching-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td colspan="5" class="empty-msg">Loading matching requests...</td></tr>';
+
+  var res = await _db.from('mentor_selection_requests').select('*').order('created_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('mentor_selection_requests').select('*');
+  }
+
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    table.innerHTML = '<tr><td colspan="5" class="empty-msg">No mentor matching requests.</td></tr>';
+    return;
+  }
+
+  var requests = res.data || [];
+  if (requests.length === 0) {
+    table.innerHTML = '<tr><td colspan="5" class="empty-msg">No pending matching or reassignment requests.</td></tr>';
+    return;
+  }
+
+  table.innerHTML = '';
+  requests.forEach(function(req) {
+    var isApproved = req.status === 'approved';
+    var isRejected = req.status === 'rejected';
+    var statusPill = isApproved 
+      ? '<span class="status-pill active-pill">APPROVED</span>' 
+      : isRejected 
+        ? '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">REJECTED</span>'
+        : '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING</span>';
+
+    var row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + escHtml(req.student_name || req.student_id || 'Student') + '</strong></td>' +
+      '<td>' + escHtml(req.mentor_name || req.mentor_id || 'Mentor') + '</td>' +
+      '<td>' + escHtml(req.reason || 'No reason specified') + '</td>' +
+      '<td>' + statusPill + '</td>' +
+      '<td>' +
+        (!isApproved && !isRejected ?
+          '<button class="api-action-btn" style="color:#059669;margin-right:6px;" onclick="approveAdminMatch(\'' + req.id + '\', \'' + req.student_id + '\', \'' + req.mentor_id + '\')">Approve</button>' +
+          '<button class="api-action-btn" style="color:#dc2626;" onclick="rejectAdminMatch(\'' + req.id + '\')">Reject</button>'
+          : '—') +
+      '</td>';
+    table.appendChild(row);
+  });
+  lucide.createIcons();
+}
+
+window.approveAdminMatch = async function(reqId, studentId, mentorId) {
+  if (!confirm('Approve this mentor match request?')) return;
+  var res = await _db.from('mentor_selection_requests').update({ status: 'approved' }).eq('id', reqId);
+  if (!res.error) {
+    if (studentId && mentorId) {
+      await _db.from('assignments').insert({ student_id: studentId, mentor_id: mentorId }).catch(function() {});
+    }
+    showToast('Match Approved', 'Mentorship matching request approved.', 'success');
+    loadAdminMatching();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+window.rejectAdminMatch = async function(reqId) {
+  if (!confirm('Reject this mentor match request?')) return;
+  var res = await _db.from('mentor_selection_requests').update({ status: 'rejected' }).eq('id', reqId);
+  if (!res.error) {
+    showToast('Match Rejected', 'Mentorship request rejected.', 'info');
+    loadAdminMatching();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Admin Live Overseer Sessions ──
+async function loadAdminSessions() {
+  var list = document.getElementById('admin-sessions-list');
+  if (!list) return;
+  list.innerHTML = '<p class="empty-msg">Loading sessions...</p>';
+
+  var res = await _db.from('academic_sessions').select('*').order('date', { ascending: true });
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    list.innerHTML = '<p class="empty-msg">Error loading sessions.</p>';
+    return;
+  }
+
+  var sessions = res.data || [];
+  if (sessions.length === 0) {
+    list.innerHTML = '<p class="empty-msg">No active or scheduled academic sessions.</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+  sessions.forEach(function(s) {
+    var card = document.createElement('div');
+    card.className = 'session-item-card';
+    card.innerHTML =
+      '<div class="session-info-core">' +
+        '<span class="session-topic-title">' + escHtml(s.topic || 'Academic Session') + '</span>' +
+        '<span class="session-time-text">' +
+          '<i data-lucide="calendar" style="width:13px;height:13px;"></i> ' + (s.date || 'Today') +
+          ' &nbsp;·&nbsp; <i data-lucide="clock" style="width:13px;height:13px;"></i> ' + (s.time || 'N/A') +
+          ' &nbsp;(' + (s.duration || 60) + ' min)' +
+        '</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<span class="status-pill active-pill">' + escHtml((s.status || 'SCHEDULED').toUpperCase()) + '</span>' +
+      '</div>';
+    list.appendChild(card);
+  });
+  lucide.createIcons();
+}
+
+// ── Admin Announcements ──
+async function loadAdminAnnouncements() {
+  var feed = document.getElementById('admin-announcements-feed');
+  if (!feed) return;
+  feed.innerHTML = '<p class="empty-msg">Loading announcements...</p>';
+
+  var res = await _db.from('announcements').select('*').order('created_at', { ascending: false });
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    feed.innerHTML = '<p class="empty-msg">Error loading announcements.</p>';
+    return;
+  }
+
+  var annList = res.data || [];
+  if (annList.length === 0) {
+    feed.innerHTML = '<p class="empty-msg">No system announcements published yet.</p>';
+    return;
+  }
+
+  feed.innerHTML = '';
+  annList.forEach(function(ann) {
+    var card = document.createElement('div');
+    card.className = 'complaint-card';
+    card.style.marginBottom = '12px';
+    card.innerHTML =
+      '<div class="complaint-header">' +
+        '<strong style="font-size:15px;color:var(--color-primary);">' + escHtml(ann.title) + '</strong>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<span class="status-pill active-pill">' + escHtml((ann.target_role || 'ALL').toUpperCase()) + '</span>' +
+          '<button class="api-action-btn" style="color:#dc2626;" onclick="deleteAnnouncement(\'' + ann.id + '\')">Delete</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="complaint-body" style="margin-top:8px;">' + escHtml(ann.content) + '</div>' +
+      '<div class="session-time-text" style="margin-top:6px;"><i data-lucide="clock" style="width:13px;height:13px;"></i> Posted: ' +
+        new Date(ann.created_at).toLocaleString() + '</div>';
+    feed.appendChild(card);
+  });
+  lucide.createIcons();
+}
+
+window.deleteAnnouncement = async function(id) {
+  if (!confirm('Delete this broadcast announcement?')) return;
+  var res = await _db.from('announcements').delete().eq('id', id);
+  if (!res.error) {
+    showToast('Deleted', 'Announcement removed.', 'info');
+    loadAdminAnnouncements();
+    loadMatshwaneAnnouncements();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+var adminAnnForm = document.getElementById('admin-announcement-form');
+if (adminAnnForm) {
+  adminAnnForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var title = document.getElementById('announcement-title').value.trim();
+    var targetRole = document.getElementById('announcement-role').value;
+    var content = document.getElementById('announcement-content').value.trim();
+
+    var res = await _db.from('announcements').insert({
+      title: title, target_role: targetRole, content: content, author_id: currentUser ? currentUser.id : null
+    });
+
+    if (!res.error) {
+      showToast('Broadcast Posted', 'System announcement has been published.', 'success');
+      adminAnnForm.reset();
+      loadAdminAnnouncements();
+    } else {
+      showToast('Error', res.error.message, 'error');
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MATSHWANE EXTENDED LOADERS — STANDING & DIRECTIVES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Matshwane Student Standing ──
+async function loadMatshwaneStatus() {
+  var table = document.getElementById('matshwane-status-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td colspan="6" class="empty-msg">Loading student standing data...</td></tr>';
+
+  var res = await _db.from('profiles').select('*').eq('role', 'student').order('created_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('profiles').select('*').eq('role', 'student');
+  }
+
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    table.innerHTML = '<tr><td colspan="6" class="empty-msg">Error loading student standing.</td></tr>';
+    return;
+  }
+
+  var students = res.data || [];
+  if (students.length === 0) {
+    table.innerHTML = '<tr><td colspan="6" class="empty-msg">No student accounts registered in system.</td></tr>';
+    return;
+  }
+
+  table.innerHTML = '';
+  students.forEach(function(s) {
+    var standing = s.academic_status || 'Active';
+    var standingPill = standing === 'Active' 
+      ? '<span class="status-pill active-pill">ACTIVE</span>'
+      : standing === 'Dropped'
+        ? '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">DROPPED</span>'
+        : '<span class="status-pill" style="background:#fef3c7;color:#d97706;">FAILED MILESTONE</span>';
+
+    var row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + escHtml(s.full_name || s.email) + '</strong></td>' +
+      '<td>' + escHtml(s.email) + '</td>' +
+      '<td>' + escHtml(s.academic_level || 'General') + '</td>' +
+      '<td>' + standingPill + '</td>' +
+      '<td>' + escHtml(s.failed_milestone || 'None') + '</td>' +
+      '<td>' +
+        '<button class="api-action-btn" style="color:#059669;margin-right:4px;" onclick="setStudentStanding(\'' + s.id + '\', \'Active\')">Active</button>' +
+        '<button class="api-action-btn" style="color:#dc2626;margin-right:4px;" onclick="setStudentStanding(\'' + s.id + '\', \'Dropped\')">Drop</button>' +
+        '<button class="api-action-btn" style="color:#d97706;" onclick="setStudentStanding(\'' + s.id + '\', \'Failed\')">Fail</button>' +
+      '</td>';
+    table.appendChild(row);
+  });
+  lucide.createIcons();
+}
+
+window.setStudentStanding = async function(studentId, standing) {
+  if (!confirm('Set student academic standing to ' + standing + '?')) return;
+  var milestone = standing === 'Failed' ? 'Formative Review 1' : null;
+  var res = await _db.from('profiles').update({ academic_status: standing, failed_milestone: milestone }).eq('id', studentId);
+  if (!res.error) {
+    showToast('Standing Updated', 'Student status changed to ' + standing + '.', 'success');
+    loadMatshwaneStatus();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Matshwane Directives & Notices ──
+async function loadMatshwaneAnnouncements() {
+  var feed = document.getElementById('matshwane-announcements-feed');
+  if (!feed) return;
+  feed.innerHTML = '<p class="empty-msg">Loading governance directives...</p>';
+
+  var res = await _db.from('announcements').select('*').order('created_at', { ascending: false });
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    feed.innerHTML = '<p class="empty-msg">Error loading directives.</p>';
+    return;
+  }
+
+  var annList = res.data || [];
+  if (annList.length === 0) {
+    feed.innerHTML = '<p class="empty-msg">No governance directives published yet.</p>';
+    return;
+  }
+
+  feed.innerHTML = '';
+  annList.forEach(function(ann) {
+    var card = document.createElement('div');
+    card.className = 'complaint-card';
+    card.style.marginBottom = '12px';
+    card.innerHTML =
+      '<div class="complaint-header">' +
+        '<strong style="font-size:15px;color:var(--color-primary);">' + escHtml(ann.title) + '</strong>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<span class="status-pill matshwane-pill">DIRECTIVE</span>' +
+          '<button class="api-action-btn" style="color:#dc2626;" onclick="deleteAnnouncement(\'' + ann.id + '\')">Delete</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="complaint-body" style="margin-top:8px;">' + escHtml(ann.content) + '</div>' +
+      '<div class="session-time-text" style="margin-top:6px;"><i data-lucide="clock" style="width:13px;height:13px;"></i> Issued: ' +
+        new Date(ann.created_at).toLocaleString() + '</div>';
+    feed.appendChild(card);
+  });
+  lucide.createIcons();
+}
+
+var matshwaneAnnForm = document.getElementById('matshwane-announcement-form');
+if (matshwaneAnnForm) {
+  matshwaneAnnForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var title = document.getElementById('matshwane-ann-title').value.trim();
+    var content = document.getElementById('matshwane-ann-content').value.trim();
+
+    var res = await _db.from('announcements').insert({
+      title: title, target_role: 'matshwane_directive', content: content, author_id: currentUser ? currentUser.id : null
+    });
+
+    if (!res.error) {
+      showToast('Directive Issued', 'Governance directive published.', 'success');
+      matshwaneAnnForm.reset();
+      loadMatshwaneAnnouncements();
+    } else {
+      showToast('Error', res.error.message, 'error');
+    }
+  });
+}
+
+// ── Refresh Button Listeners (Extended) ──
+var refreshMatchingBtn = document.getElementById('admin-refresh-matching-btn');
+if (refreshMatchingBtn) refreshMatchingBtn.addEventListener('click', loadAdminMatching);
+
+var refreshSessionsBtn = document.getElementById('admin-refresh-sessions-btn');
+if (refreshSessionsBtn) refreshSessionsBtn.addEventListener('click', loadAdminSessions);
+
+var refreshAnnouncementsBtn = document.getElementById('admin-refresh-announcements-btn');
+if (refreshAnnouncementsBtn) refreshAnnouncementsBtn.addEventListener('click', loadAdminAnnouncements);
+
+var refreshStatusBtn = document.getElementById('matshwane-refresh-status-btn');
+if (refreshStatusBtn) refreshStatusBtn.addEventListener('click', loadMatshwaneStatus);
+
+var refreshMatshwaneAnnBtn = document.getElementById('matshwane-refresh-announcements-btn');
+if (refreshMatshwaneAnnBtn) refreshMatshwaneAnnBtn.addEventListener('click', loadMatshwaneAnnouncements);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 lucide.createIcons();
