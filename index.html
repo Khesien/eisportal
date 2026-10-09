@@ -569,31 +569,150 @@
       <div class="dashboard-layout">
         <aside class="dashboard-sidebar">
           <div class="mentor-profile-info">
-            <div class="profile-avatar matshwane-avatar"><i data-lucide="eye"></i></div>
-            <h3>Matshwane Admin</h3>
-            <span class="status-pill matshwane-pill">OVERSIGHT</span>
+            <div class="profile-avatar matshwane-avatar"><i data-lucide="shield-alert"></i></div>
+            <h3>Matshwane Officer</h3>
+            <span class="status-pill matshwane-pill">OVERSIGHT & REGISTRY</span>
           </div>
           <ul class="sidebar-menu">
-            <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="activity"></i> Oversight</li>
+            <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="shield-alert"></i> Oversight & Safety</li>
+            <li class="menu-item" data-tab="matshwane-roster"><i data-lucide="user-check"></i> Applications & Roster</li>
+            <li class="menu-item" data-tab="matshwane-education"><i data-lucide="award"></i> Academic Verification</li>
+            <li class="menu-item" data-tab="matshwane-agreements"><i data-lucide="file-signature"></i> Contracts & Compliance</li>
             <li class="menu-item" data-tab="matshwane-audits"><i data-lucide="clipboard-list"></i> Audit Logs</li>
           </ul>
         </aside>
 
         <div class="dashboard-content">
-          <!-- Oversight -->
+          <!-- Oversight & Safety -->
           <div id="matshwane-tab-oversight" class="subtab-content active">
-            <h2 class="page-title">Child Protection & Oversight</h2>
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Child Protection & Disciplinary Oversight</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-reports-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
             <div class="card padding-lg">
-              <h3>Disciplinary Reports</h3>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin:0;">Safety & Violation Reports</h3>
+                <div class="btn-group" style="gap:8px;">
+                  <button class="nav-btn active" id="filter-rep-all">All Reports</button>
+                  <button class="nav-btn" id="filter-rep-pending">Pending</button>
+                  <button class="nav-btn" id="filter-rep-resolved">Resolved</button>
+                </div>
+              </div>
               <div class="reports-list" id="matshwane-reports-list">
                 <p class="empty-msg">No active disciplinary reports.</p>
               </div>
             </div>
           </div>
 
+          <!-- Applications & Roster -->
+          <div id="matshwane-tab-roster" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Matshwane Registry & Mentor Applications</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-roster-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+
+            <!-- Pending Applications Section -->
+            <div class="card padding-lg margin-bottom-lg">
+              <h3>Pending Mentor Applications</h3>
+              <div class="applications-container" id="matshwane-applications-list" style="margin-top:16px;">
+                <p class="empty-msg">No pending applications.</p>
+              </div>
+            </div>
+
+            <!-- Active Roster Section -->
+            <div class="card padding-lg">
+              <h3>Active & Onboarded Mentor Roster</h3>
+              <div class="table-wrap" style="margin-top:16px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Ticket #</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matshwane-roster-table">
+                    <tr><td colspan="5" class="empty-msg">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Academic Records Verification -->
+          <div id="matshwane-tab-education" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Academic Record Verifications</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-edu-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>Student Educational Qualifications</h3>
+              <div class="table-wrap" style="margin-top:16px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Institution</th>
+                      <th>Qualification / Level</th>
+                      <th>Year</th>
+                      <th>Document</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matshwane-edu-table">
+                    <tr><td colspan="7" class="empty-msg">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contracts & Compliance -->
+          <div id="matshwane-tab-agreements" class="subtab-content hidden">
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">Mentor Contracts & Compliance</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-agreements-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
+            <div class="card padding-lg">
+              <h3>Signed Agreements & Governance Packages</h3>
+              <div class="table-wrap" style="margin-top:16px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mentor</th>
+                      <th>Signed Date</th>
+                      <th>Governance Version</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matshwane-agreements-table">
+                    <tr><td colspan="5" class="empty-msg">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Audit Logs -->
           <div id="matshwane-tab-audits" class="subtab-content hidden">
-            <h2 class="page-title">System Audit Logs</h2>
+            <div class="view-header">
+              <h2 class="page-title" style="margin-bottom:0;">System Audit Logs</h2>
+              <button class="submit-btn max-w-xs" id="matshwane-refresh-audits-btn">
+                <i data-lucide="refresh-cw"></i> Refresh
+              </button>
+            </div>
             <div class="card padding-lg">
               <h3>Security Audit Trail</h3>
               <div class="table-wrap">

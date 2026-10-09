@@ -106,7 +106,9 @@ function initSubtabNavigation(sectionSelector) {
         'mentor-schedule':'mentor-tab-schedule', 'mentor-wallet':'mentor-tab-wallet',
         'mentor-download':'mentor-tab-download', 'admin-users':'admin-tab-users',
         'admin-applications':'admin-tab-applications', 'admin-apikeys':'admin-tab-apikeys',
-        'matshwane-oversight':'matshwane-tab-oversight', 'matshwane-audits':'matshwane-tab-audits',
+        'matshwane-oversight':'matshwane-tab-oversight', 'matshwane-roster':'matshwane-tab-roster',
+        'matshwane-education':'matshwane-tab-education', 'matshwane-agreements':'matshwane-tab-agreements',
+        'matshwane-audits':'matshwane-tab-audits',
       };
       var targetEl = container.querySelector('#' + (idMap[tabId] || tabId));
       if (targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
@@ -115,7 +117,8 @@ function initSubtabNavigation(sectionSelector) {
         'mentor-schedule': loadMentorMenteesDropdown, 'mentor-wallet': loadMentorWallet,
         'admin-users': loadAdminRegistry, 'admin-applications': loadMentorApplications,
         'admin-apikeys': loadAdminApiKeys, 'matshwane-oversight': loadMatshwaneOversight,
-        'matshwane-audits': loadMatshwaneAudits,
+        'matshwane-roster': loadMatshwaneRoster, 'matshwane-education': loadMatshwaneEducation,
+        'matshwane-agreements': loadMatshwaneAgreements, 'matshwane-audits': loadMatshwaneAudits,
       };
       if (loaders[tabId]) loaders[tabId]();
     });
@@ -622,22 +625,29 @@ async function loadMentorApplications() {
   var list = document.getElementById('admin-applications-list');
   list.innerHTML = '<p class="empty-msg">Loading...</p>';
   var res = await _db.from('mentor_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('mentor_applications').select('*').eq('status', 'pending').order('submitted_at', { ascending: false });
+  }
+  if (res.error) {
+    res = await _db.from('mentor_applications').select('*').eq('status', 'pending');
+  }
   if (res.error) { showToast('Error', res.error.message, 'error'); return; }
   var apps = res.data;
   if (!apps || apps.length === 0) { list.innerHTML = '<p class="empty-msg">No pending mentor applications.</p>'; return; }
   list.innerHTML = '';
   apps.forEach(function(app) {
+    var appName = app.name || ((app.first_name || '') + ' ' + (app.last_name || '')).trim() || 'Applicant';
     var card = document.createElement('div');
     card.className = 'application-card';
     card.innerHTML =
       '<div class="app-header">' +
-        '<div><div class="app-title">' + escHtml(app.name) + '</div><div class="app-email">' + escHtml(app.email) + '</div></div>' +
+        '<div><div class="app-title">' + escHtml(appName) + '</div><div class="app-email">' + escHtml(app.email || 'N/A') + '</div></div>' +
         '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING</span>' +
       '</div>' +
       '<div class="app-meta"><strong>Subjects:</strong> ' + escHtml(Array.isArray(app.subjects) ? app.subjects.join(', ') : app.subjects || '—') +
-        '<br><strong>Background:</strong> ' + escHtml(app.bio || '—') + '</div>' +
+        '<br><strong>Background:</strong> ' + escHtml(app.bio || app.experience_elaboration || '—') + '</div>' +
       '<div class="app-actions">' +
-        '<button class="approve-btn" onclick="approveApplication(\'' + app.id + '\',\'' + escAttr(app.name) + '\',\'' + escAttr(app.email) + '\')">✓ Approve</button>' +
+        '<button class="approve-btn" onclick="approveApplication(\'' + app.id + '\',\'' + escAttr(appName) + '\',\'' + escAttr(app.email) + '\')">✓ Approve</button>' +
         '<button class="reject-btn" onclick="rejectApplication(\'' + app.id + '\')">✕ Reject</button>' +
       '</div>';
     list.appendChild(card);
@@ -738,45 +748,433 @@ document.getElementById('admin-key-form').addEventListener('submit', async funct
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MATSHWANE PORTAL — LOADERS
+// MATSHWANE PORTAL — LOADERS & ACTIONS
 // ══════════════════════════════════════════════════════════════════════════════
+var currentReportFilter = 'all';
+
 async function loadMatshwaneOversight() {
   var list = document.getElementById('matshwane-reports-list');
-  list.innerHTML = '<p class="empty-msg">Loading...</p>';
-  var res = await _db.from('violation_reports').select('*').order('timestamp', { ascending: false });
-  if (res.error) { showToast('Error', res.error.message, 'error'); return; }
-  var reports = res.data;
-  if (!reports || reports.length === 0) { list.innerHTML = '<p class="empty-msg">No active disciplinary reports.</p>'; return; }
+  if (!list) return;
+  list.innerHTML = '<p class="empty-msg">Loading disciplinary reports...</p>';
+
+  var res = await _db.from('violation_reports').select('*').order('created_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('violation_reports').select('*').order('timestamp', { ascending: false });
+  }
+  if (res.error) {
+    res = await _db.from('violation_reports').select('*');
+  }
+
+  if (res.error) {
+    showToast('Error Loading Oversight', res.error.message, 'error');
+    list.innerHTML = '<p class="empty-msg">Error loading reports.</p>';
+    return;
+  }
+
+  var reports = res.data || [];
+  if (currentReportFilter === 'pending') {
+    reports = reports.filter(function(r) { return r.status === 'pending' || !r.status; });
+  } else if (currentReportFilter === 'resolved') {
+    reports = reports.filter(function(r) { return r.status === 'resolved'; });
+  }
+
+  if (reports.length === 0) {
+    list.innerHTML = '<p class="empty-msg">No active disciplinary reports matching criteria.</p>';
+    return;
+  }
+
   list.innerHTML = '';
   reports.forEach(function(rep) {
     var card = document.createElement('div');
     card.className = 'complaint-card';
+    var isResolved = rep.status === 'resolved';
+    var isDismissed = rep.status === 'dismissed';
+    var statusBadge = isResolved
+      ? '<span class="status-pill active-pill">RESOLVED</span>'
+      : isDismissed
+        ? '<span class="status-pill" style="background:#f3f4f6;color:#6b7280;">DISMISSED</span>'
+        : '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">PENDING ACTION</span>';
+
+    var reportDate = rep.created_at || rep.timestamp || rep.submitted_at;
+    var formattedDate = reportDate ? new Date(reportDate).toLocaleString() : 'N/A';
+
     card.innerHTML =
       '<div class="complaint-header">' +
-        '<span class="complaint-reporter">Reporter: ' + (rep.is_anonymous ? 'Anonymous' : escHtml(rep.reporter_id || 'N/A')) + '</span>' +
-        '<span class="complaint-severity severity-' + (rep.severity || 'med').toLowerCase() + '">' + (rep.severity || 'MEDIUM').toUpperCase() + ' ALERT</span>' +
+        '<span class="complaint-reporter">Reporter ID: ' + (rep.is_anonymous ? 'Anonymous' : escHtml(rep.reporter_id || 'N/A')) + '</span>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          statusBadge +
+          '<span class="complaint-severity severity-' + (rep.severity || 'med').toLowerCase() + '">' + (rep.severity || 'MEDIUM').toUpperCase() + '</span>' +
+        '</div>' +
       '</div>' +
-      '<div class="complaint-body"><strong>Target:</strong> ' + escHtml(rep.target_name || 'N/A') +
-        '<br><strong>Details:</strong> ' + escHtml(rep.description || '—') + '</div>' +
-      '<div class="session-time-text"><i data-lucide="clock" style="width:13px;height:13px;"></i> Reported: ' +
-        new Date(rep.timestamp || rep.created_at).toLocaleString() + '</div>';
+      '<div class="complaint-body">' +
+        '<strong>Target Person:</strong> ' + escHtml(rep.target_name || rep.target_user_id || 'N/A') + '<br>' +
+        '<strong>Description:</strong> ' + escHtml(rep.description || 'No details provided.') +
+      '</div>' +
+      '<div class="session-time-text" style="margin-top:8px;"><i data-lucide="clock" style="width:13px;height:13px;"></i> Reported: ' + formattedDate + '</div>' +
+      (!isResolved && !isDismissed ?
+        '<div class="app-actions" style="margin-top:12px;">' +
+          '<button class="approve-btn" onclick="resolveViolationReport(\'' + rep.id + '\')">✓ Resolve & Clear</button>' +
+          '<button class="reject-btn" onclick="dismissViolationReport(\'' + rep.id + '\')">✕ Dismiss</button>' +
+        '</div>' : ''
+      );
     list.appendChild(card);
   });
   lucide.createIcons();
 }
 
-async function loadMatshwaneAudits() {
-  var table = document.getElementById('matshwane-audits-table');
-  table.innerHTML = '<tr><td colspan="4" class="empty-msg">Loading...</td></tr>';
-  var res = await _db.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(50);
-  if (res.error) { showToast('Error', res.error.message, 'error'); return; }
-  var logs = res.data;
-  if (!logs || logs.length === 0) { table.innerHTML = '<tr><td colspan="4" class="empty-msg">No audit logs yet.</td></tr>'; return; }
+window.resolveViolationReport = async function(id) {
+  if (!confirm('Mark this disciplinary report as resolved?')) return;
+  var res = await _db.from('violation_reports').update({ status: 'resolved' }).eq('id', id);
+  if (!res.error) {
+    showToast('Report Resolved', 'The report has been marked as resolved.', 'success');
+    loadMatshwaneOversight();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+window.dismissViolationReport = async function(id) {
+  if (!confirm('Dismiss this disciplinary report?')) return;
+  var res = await _db.from('violation_reports').update({ status: 'dismissed' }).eq('id', id);
+  if (!res.error) {
+    showToast('Report Dismissed', 'The report has been dismissed.', 'info');
+    loadMatshwaneOversight();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Report Filter Listeners ──
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'filter-rep-all') {
+    currentReportFilter = 'all';
+    updateFilterBtns('filter-rep-all');
+    loadMatshwaneOversight();
+  } else if (e.target && e.target.id === 'filter-rep-pending') {
+    currentReportFilter = 'pending';
+    updateFilterBtns('filter-rep-pending');
+    loadMatshwaneOversight();
+  } else if (e.target && e.target.id === 'filter-rep-resolved') {
+    currentReportFilter = 'resolved';
+    updateFilterBtns('filter-rep-resolved');
+    loadMatshwaneOversight();
+  }
+});
+
+function updateFilterBtns(activeId) {
+  ['filter-rep-all', 'filter-rep-pending', 'filter-rep-resolved'].forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (btn) {
+      if (id === activeId) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+}
+
+// ── Refresh Button Listeners ──
+var refreshReportsBtn = document.getElementById('matshwane-refresh-reports-btn');
+if (refreshReportsBtn) refreshReportsBtn.addEventListener('click', loadMatshwaneOversight);
+
+var refreshRosterBtn = document.getElementById('matshwane-refresh-roster-btn');
+if (refreshRosterBtn) refreshRosterBtn.addEventListener('click', loadMatshwaneRoster);
+
+var refreshEduBtn = document.getElementById('matshwane-refresh-edu-btn');
+if (refreshEduBtn) refreshEduBtn.addEventListener('click', loadMatshwaneEducation);
+
+var refreshAgreementsBtn = document.getElementById('matshwane-refresh-agreements-btn');
+if (refreshAgreementsBtn) refreshAgreementsBtn.addEventListener('click', loadMatshwaneAgreements);
+
+var refreshAuditsBtn = document.getElementById('matshwane-refresh-audits-btn');
+if (refreshAuditsBtn) refreshAuditsBtn.addEventListener('click', loadMatshwaneAudits);
+
+// ── Matshwane Registry & Roster Loader ──
+async function loadMatshwaneRoster() {
+  var appList = document.getElementById('matshwane-applications-list');
+  if (appList) {
+    appList.innerHTML = '<p class="empty-msg">Loading applications...</p>';
+    var appRes = await _db.from('mentor_applications').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+    if (appRes.error) {
+      appRes = await _db.from('mentor_applications').select('*').eq('status', 'pending').order('submitted_at', { ascending: false });
+    }
+    if (appRes.error) {
+      appRes = await _db.from('mentor_applications').select('*').eq('status', 'pending');
+    }
+
+    var apps = (appRes && appRes.data) || [];
+    if (apps.length === 0) {
+      appList.innerHTML = '<p class="empty-msg">No pending mentor applications in registry.</p>';
+    } else {
+      appList.innerHTML = '';
+      apps.forEach(function(app) {
+        var card = document.createElement('div');
+        card.className = 'application-card';
+        var appName = app.name || ((app.first_name || '') + ' ' + (app.last_name || '')).trim() || 'Applicant';
+        card.innerHTML =
+          '<div class="app-header">' +
+            '<div><div class="app-title">' + escHtml(appName) + '</div><div class="app-email">' + escHtml(app.email || 'N/A') + '</div></div>' +
+            '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING REVIEW</span>' +
+          '</div>' +
+          '<div class="app-meta">' +
+            '<strong>Subjects:</strong> ' + escHtml(Array.isArray(app.subjects) ? app.subjects.join(', ') : app.subjects || '—') + '<br>' +
+            '<strong>Academy / Tertiary:</strong> ' + escHtml(app.academy || app.tertiary_year || 'N/A') + '<br>' +
+            '<strong>Background:</strong> ' + escHtml(app.bio || app.experience_elaboration || '—') +
+          '</div>' +
+          '<div class="app-actions">' +
+            '<button class="approve-btn" onclick="approveMatshwaneApp(\'' + app.id + '\', \'' + escAttr(appName) + '\', \'' + escAttr(app.email) + '\')">✓ Approve Mentor</button>' +
+            '<button class="reject-btn" onclick="rejectMatshwaneApp(\'' + app.id + '\')">✕ Reject</button>' +
+          '</div>';
+        appList.appendChild(card);
+      });
+    }
+  }
+
+  var rosterTable = document.getElementById('matshwane-roster-table');
+  if (rosterTable) {
+    rosterTable.innerHTML = '<tr><td colspan="5" class="empty-msg">Loading roster...</td></tr>';
+    var profRes = await _db.from('profiles').select('*').eq('role', 'mentor').order('created_at', { ascending: false });
+    if (profRes.error) {
+      profRes = await _db.from('profiles').select('*').eq('role', 'mentor');
+    }
+
+    var mentors = (profRes && profRes.data) || [];
+    if (mentors.length === 0) {
+      rosterTable.innerHTML = '<tr><td colspan="5" class="empty-msg">No mentors registered in database.</td></tr>';
+      return;
+    }
+    rosterTable.innerHTML = '';
+    mentors.forEach(function(m) {
+      var isSuspended = m.status === 'suspended';
+      var row = document.createElement('tr');
+      row.innerHTML =
+        '<td><strong>' + escHtml(m.full_name || m.name || '—') + '</strong></td>' +
+        '<td>' + escHtml(m.email) + '</td>' +
+        '<td><code style="font-size:12px;color:var(--color-primary);font-weight:600;">' + escHtml(m.ticket_number || 'N/A') + '</code></td>' +
+        '<td><span class="status-pill ' + (isSuspended ? '' : 'active-pill') + '" style="' + (isSuspended ? 'background:#fee2e2;color:#dc2626;' : '') + '">' +
+          escHtml((m.status || 'active').toUpperCase()) + '</span></td>' +
+        '<td>' +
+          (!isSuspended
+            ? '<button class="api-action-btn" style="color:#dc2626;" onclick="suspendMatshwaneMentor(\'' + m.id + '\')">Suspend</button>'
+            : '<button class="api-action-btn" style="color:#059669;" onclick="reinstateMatshwaneMentor(\'' + m.id + '\')">Reinstate</button>') +
+        '</td>';
+      rosterTable.appendChild(row);
+    });
+  }
+}
+
+window.approveMatshwaneApp = async function(appId, name, email) {
+  if (!confirm('Approve mentor application for ' + name + '?')) return;
+  var formalId = 'EIS-MT-' + Math.floor(1000 + Math.random() * 9000);
+
+  var appRes = await _db.from('mentor_applications').update({ status: 'approved', ticket_number: formalId }).eq('id', appId);
+  if (appRes.error) { showToast('Error', appRes.error.message, 'error'); return; }
+
+  var profRes = await _db.from('profiles').select('id').eq('email', email).single();
+  if (profRes.data) {
+    await _db.from('profiles').update({ role: 'mentor', status: 'active', ticket_number: formalId }).eq('id', profRes.data.id);
+  } else {
+    await _db.from('profiles').insert({ full_name: name, email: email, role: 'mentor', status: 'active', ticket_number: formalId });
+  }
+
+  showToast('Application Approved', name + ' approved. Ticket: ' + formalId, 'success', 7000);
+  loadMatshwaneRoster();
+};
+
+window.rejectMatshwaneApp = async function(appId) {
+  if (!confirm('Reject this mentor application?')) return;
+  var res = await _db.from('mentor_applications').update({ status: 'rejected' }).eq('id', appId);
+  if (!res.error) {
+    showToast('Application Rejected', 'The application has been rejected.', 'info');
+    loadMatshwaneRoster();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+window.suspendMatshwaneMentor = async function(userId) {
+  if (!confirm('Suspend this mentor?')) return;
+  var res = await _db.from('profiles').update({ status: 'suspended' }).eq('id', userId);
+  if (!res.error) {
+    showToast('Mentor Suspended', 'The mentor account has been suspended.', 'warning');
+    loadMatshwaneRoster();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+window.reinstateMatshwaneMentor = async function(userId) {
+  if (!confirm('Reinstate this mentor?')) return;
+  var res = await _db.from('profiles').update({ status: 'active' }).eq('id', userId);
+  if (!res.error) {
+    showToast('Mentor Reinstated', 'The mentor account is now active.', 'success');
+    loadMatshwaneRoster();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Academic Verification Loader ──
+async function loadMatshwaneEducation() {
+  var table = document.getElementById('matshwane-edu-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td colspan="7" class="empty-msg">Loading academic records...</td></tr>';
+
+  var res = await _db.from('educational_records').select('*').order('created_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('educational_records').select('*');
+  }
+
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    table.innerHTML = '<tr><td colspan="7" class="empty-msg">Error loading academic records.</td></tr>';
+    return;
+  }
+
+  var records = res.data || [];
+  if (records.length === 0) {
+    table.innerHTML = '<tr><td colspan="7" class="empty-msg">No academic records found for verification.</td></tr>';
+    return;
+  }
+
   table.innerHTML = '';
-  logs.forEach(function(log) {
+  records.forEach(function(rec) {
+    var isVerified = rec.status === 'verified';
+    var isRejected = rec.status === 'rejected';
+    var statusPill = isVerified
+      ? '<span class="status-pill active-pill">VERIFIED</span>'
+      : isRejected
+        ? '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">REJECTED</span>'
+        : '<span class="status-pill" style="background:#fef3c7;color:#d97706;">PENDING</span>';
+
+    var docLink = rec.document_url
+      ? '<a href="' + escAttr(rec.document_url) + '" target="_blank" style="color:var(--color-primary);font-weight:600;"><i data-lucide="external-link" style="width:13px;height:13px;"></i> View Doc</a>'
+      : '<span style="color:var(--color-text-muted);">None</span>';
+
     var row = document.createElement('tr');
     row.innerHTML =
-      '<td>' + new Date(log.timestamp).toLocaleString() + '</td>' +
+      '<td><strong>' + escHtml(rec.student_name || rec.student_id || 'Student') + '</strong></td>' +
+      '<td>' + escHtml(rec.institution || '—') + '</td>' +
+      '<td>' + escHtml(rec.qualification || rec.level || '—') + '</td>' +
+      '<td>' + escHtml(rec.year || '—') + '</td>' +
+      '<td>' + docLink + '</td>' +
+      '<td>' + statusPill + '</td>' +
+      '<td>' +
+        (!isVerified && !isRejected ?
+          '<button class="api-action-btn" style="color:#059669;margin-right:6px;" onclick="verifyMatshwaneEduRecord(\'' + rec.id + '\')">Verify</button>' +
+          '<button class="api-action-btn" style="color:#dc2626;" onclick="rejectMatshwaneEduRecord(\'' + rec.id + '\')">Reject</button>'
+          : '—') +
+      '</td>';
+    table.appendChild(row);
+  });
+  lucide.createIcons();
+}
+
+window.verifyMatshwaneEduRecord = async function(id) {
+  if (!confirm('Verify and approve this academic record?')) return;
+  var res = await _db.from('educational_records').update({ status: 'verified' }).eq('id', id);
+  if (!res.error) {
+    showToast('Record Verified', 'Academic record has been verified.', 'success');
+    loadMatshwaneEducation();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+window.rejectMatshwaneEduRecord = async function(id) {
+  if (!confirm('Reject this academic record?')) return;
+  var res = await _db.from('educational_records').update({ status: 'rejected' }).eq('id', id);
+  if (!res.error) {
+    showToast('Record Rejected', 'Academic record has been rejected.', 'info');
+    loadMatshwaneEducation();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Contracts & Compliance Loader ──
+async function loadMatshwaneAgreements() {
+  var table = document.getElementById('matshwane-agreements-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td colspan="5" class="empty-msg">Loading mentor agreements...</td></tr>';
+
+  var res = await _db.from('mentor_agreements').select('*').order('signed_at', { ascending: false });
+  if (res.error) {
+    res = await _db.from('mentor_agreements').select('*');
+  }
+
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    table.innerHTML = '<tr><td colspan="5" class="empty-msg">Error loading agreements.</td></tr>';
+    return;
+  }
+
+  var list = res.data || [];
+  if (list.length === 0) {
+    table.innerHTML = '<tr><td colspan="5" class="empty-msg">No mentor agreements found.</td></tr>';
+    return;
+  }
+
+  table.innerHTML = '';
+  list.forEach(function(arg) {
+    var signedDate = arg.signed_at ? new Date(arg.signed_at).toLocaleDateString() : 'N/A';
+    var isApproved = arg.status === 'approved';
+    var row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + escHtml(arg.mentor_name || arg.mentor_id || 'Mentor') + '</strong></td>' +
+      '<td>' + signedDate + '</td>' +
+      '<td><span class="status-pill active-pill">v2026.1 GOVERNANCE</span></td>' +
+      '<td><span class="status-pill ' + (isApproved ? 'active-pill' : '') + '">' + escHtml((arg.status || 'signed').toUpperCase()) + '</span></td>' +
+      '<td>' +
+        (!isApproved ?
+          '<button class="api-action-btn" style="color:#059669;" onclick="approveMatshwaneAgreement(\'' + arg.id + '\')">Approve Contract</button>'
+          : '✓ Fully Compliant') +
+      '</td>';
+    table.appendChild(row);
+  });
+  lucide.createIcons();
+}
+
+window.approveMatshwaneAgreement = async function(id) {
+  if (!confirm('Approve this mentor contract package?')) return;
+  var res = await _db.from('mentor_agreements').update({ status: 'approved' }).eq('id', id);
+  if (!res.error) {
+    showToast('Agreement Approved', 'Mentor contract package approved.', 'success');
+    loadMatshwaneAgreements();
+  } else {
+    showToast('Error', res.error.message, 'error');
+  }
+};
+
+// ── Audit Logs Loader ──
+async function loadMatshwaneAudits() {
+  var table = document.getElementById('matshwane-audits-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td colspan="4" class="empty-msg">Loading audit logs...</td></tr>';
+
+  var res = await _db.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(50);
+  if (res.error) {
+    res = await _db.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50);
+  }
+  if (res.error) {
+    res = await _db.from('audit_logs').select('*').limit(50);
+  }
+
+  if (res.error) {
+    showToast('Error', res.error.message, 'error');
+    table.innerHTML = '<tr><td colspan="4" class="empty-msg">Error loading audit logs.</td></tr>';
+    return;
+  }
+
+  var logs = res.data || [];
+  if (logs.length === 0) {
+    table.innerHTML = '<tr><td colspan="4" class="empty-msg">No audit logs recorded yet.</td></tr>';
+    return;
+  }
+  table.innerHTML = '';
+  logs.forEach(function(log) {
+    var logTime = log.timestamp || log.created_at;
+    var row = document.createElement('tr');
+    row.innerHTML =
+      '<td>' + (logTime ? new Date(logTime).toLocaleString() : 'N/A') + '</td>' +
       '<td><strong>' + escHtml(log.user_id || 'SYSTEM') + '</strong></td>' +
       '<td>' + escHtml(log.action) + '</td>' +
       '<td><code style="font-size:11px;color:var(--color-primary);">' + escHtml(log.ip_address || '127.0.0.1') + '</code></td>';
