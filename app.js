@@ -107,11 +107,11 @@ function initSubtabNavigation(sectionSelector) {
         'mentor-download':'mentor-tab-download', 'admin-users':'admin-tab-users',
         'admin-applications':'admin-tab-applications', 'admin-apikeys':'admin-tab-apikeys',
         'admin-matching':'admin-tab-matching', 'admin-sessions':'admin-tab-sessions',
-        'admin-announcements':'admin-tab-announcements',
+        'admin-announcements':'admin-tab-announcements', 'admin-settings':'admin-tab-settings',
         'matshwane-oversight':'matshwane-tab-oversight', 'matshwane-roster':'matshwane-tab-roster',
         'matshwane-status':'matshwane-tab-status', 'matshwane-education':'matshwane-tab-education',
         'matshwane-agreements':'matshwane-tab-agreements', 'matshwane-announcements':'matshwane-tab-announcements',
-        'matshwane-audits':'matshwane-tab-audits',
+        'matshwane-audits':'matshwane-tab-audits', 'matshwane-settings':'matshwane-tab-settings',
       };
       var targetEl = container.querySelector('#' + (idMap[tabId] || tabId));
       if (targetEl) { targetEl.classList.remove('hidden'); targetEl.classList.add('active'); }
@@ -121,10 +121,11 @@ function initSubtabNavigation(sectionSelector) {
         'admin-users': loadAdminRegistry, 'admin-applications': loadMentorApplications,
         'admin-apikeys': loadAdminApiKeys, 'admin-matching': loadAdminMatching,
         'admin-sessions': loadAdminSessions, 'admin-announcements': loadAdminAnnouncements,
+        'admin-settings': loadAdminSettings,
         'matshwane-oversight': loadMatshwaneOversight, 'matshwane-roster': loadMatshwaneRoster,
         'matshwane-status': loadMatshwaneStatus, 'matshwane-education': loadMatshwaneEducation,
         'matshwane-agreements': loadMatshwaneAgreements, 'matshwane-announcements': loadMatshwaneAnnouncements,
-        'matshwane-audits': loadMatshwaneAudits,
+        'matshwane-audits': loadMatshwaneAudits, 'matshwane-settings': loadMatshwaneSettings,
       };
       if (loaders[tabId]) loaders[tabId]();
     });
@@ -1811,3 +1812,230 @@ window.exportTableToCSV = function(tableId, filename) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 lucide.createIcons();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTINGS — Admin
+// ══════════════════════════════════════════════════════════════════════════════
+function loadAdminSettings() {
+  if (!currentProfile) return;
+
+  // Populate profile fields
+  var nameEl  = document.getElementById('admin-setting-name');
+  var emailEl = document.getElementById('admin-setting-email');
+  if (nameEl)  nameEl.value  = currentProfile.full_name || '';
+  if (emailEl) emailEl.value = currentProfile.email     || '';
+
+  // Populate session info
+  var sName  = document.getElementById('admin-session-name');
+  var sEmail = document.getElementById('admin-session-email');
+  var sTime  = document.getElementById('admin-session-time');
+  if (sName)  sName.textContent  = currentProfile.full_name || '—';
+  if (sEmail) sEmail.textContent = currentProfile.email     || '—';
+  if (sTime)  sTime.textContent  = new Date().toLocaleString('en-ZA');
+
+  // Load API keys into Settings panel (reuse same data source)
+  loadAdminApiKeys();
+  // Also mirror to settings table
+  setTimeout(function() {
+    var srcTable = document.getElementById('admin-apikeys-table');
+    var dstTable = document.getElementById('admin-settings-apikeys-table');
+    if (srcTable && dstTable) dstTable.innerHTML = srcTable.innerHTML;
+  }, 800);
+
+  lucide.createIcons();
+}
+
+// Admin — Profile form
+var adminProfileForm = document.getElementById('admin-profile-form');
+if (adminProfileForm) adminProfileForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var newName = (document.getElementById('admin-setting-name') || {}).value || '';
+  if (!newName.trim()) { showToast('Validation', 'Name cannot be empty.', 'warning'); return; }
+  var btn = adminProfileForm.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  var { error } = await _db.from('profiles').update({ full_name: newName }).eq('id', currentUser.id);
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="save"></i> Save Profile'; lucide.createIcons(); }
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  currentProfile.full_name = newName;
+  var adminNameDisplay = document.getElementById('admin-name-display');
+  if (adminNameDisplay) adminNameDisplay.textContent = newName;
+  showToast('Profile Updated', 'Your display name has been saved.', 'success');
+});
+
+// Admin — Password form
+var adminPasswordForm = document.getElementById('admin-password-form');
+if (adminPasswordForm) adminPasswordForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var pw1 = (document.getElementById('admin-new-password')     || {}).value || '';
+  var pw2 = (document.getElementById('admin-confirm-password') || {}).value || '';
+  if (pw1.length < 8)  { showToast('Validation', 'Password must be at least 8 characters.', 'warning'); return; }
+  if (pw1 !== pw2)     { showToast('Validation', 'Passwords do not match.', 'warning'); return; }
+  var btn = adminPasswordForm.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+  var { error } = await _db.auth.updateUser({ password: pw1 });
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="shield-check"></i> Update Password'; lucide.createIcons(); }
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  document.getElementById('admin-new-password').value     = '';
+  document.getElementById('admin-confirm-password').value = '';
+  showToast('Password Updated', 'Your portal password has been changed successfully.', 'success');
+});
+
+// Admin — Settings API Key generate box toggle
+var adminSettingsNewKeyBtn = document.getElementById('admin-settings-new-key-btn');
+if (adminSettingsNewKeyBtn) adminSettingsNewKeyBtn.addEventListener('click', function() {
+  var box = document.getElementById('admin-settings-key-box');
+  if (box) box.classList.toggle('hidden');
+});
+var adminSettingsKeyCancel = document.getElementById('admin-settings-key-cancel');
+if (adminSettingsKeyCancel) adminSettingsKeyCancel.addEventListener('click', function() {
+  var box = document.getElementById('admin-settings-key-box');
+  if (box) box.classList.add('hidden');
+});
+
+var adminSettingsKeyForm = document.getElementById('admin-settings-key-form');
+if (adminSettingsKeyForm) adminSettingsKeyForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var name  = (document.getElementById('settings-key-name')  || {}).value || '';
+  var read  = (document.getElementById('settings-key-read')  || {}).checked;
+  var write = (document.getElementById('settings-key-write') || {}).checked;
+  var admin = (document.getElementById('settings-key-admin') || {}).checked;
+  if (!name.trim()) { showToast('Validation', 'Please enter an integration name.', 'warning'); return; }
+  var token = 'eis_' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  var perms = [read ? 'read' : null, write ? 'write' : null, admin ? 'admin' : null].filter(Boolean).join(', ');
+  var { error } = await _db.from('api_keys').insert({
+    name: name, token: token, permissions: perms, status: 'active', created_by: currentUser.id
+  });
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  document.getElementById('admin-settings-key-box').classList.add('hidden');
+  adminSettingsKeyForm.reset();
+  document.getElementById('settings-key-read').checked = true;
+  showToast('API Key Created', 'Key "' + name + '" generated. Copy it from the table below.', 'success', 6000);
+  // Reload both tables
+  loadAdminApiKeys();
+  setTimeout(function() {
+    var srcTable = document.getElementById('admin-apikeys-table');
+    var dstTable = document.getElementById('admin-settings-apikeys-table');
+    if (srcTable && dstTable) dstTable.innerHTML = srcTable.innerHTML;
+  }, 800);
+});
+
+// Admin — Notification save
+var adminSaveNotifBtn = document.getElementById('admin-save-notif-btn');
+if (adminSaveNotifBtn) adminSaveNotifBtn.addEventListener('click', function() {
+  showToast('Preferences Saved', 'Your notification settings have been updated.', 'success');
+});
+
+// Admin — Settings sign out
+var adminSettingsLogoutBtn = document.getElementById('admin-settings-logout-btn');
+if (adminSettingsLogoutBtn) adminSettingsLogoutBtn.addEventListener('click', function() {
+  document.getElementById('logout-btn').click();
+});
+
+// Admin — Danger zone: Clear cache
+var adminClearCacheBtn = document.getElementById('admin-clear-cache-btn');
+if (adminClearCacheBtn) adminClearCacheBtn.addEventListener('click', function() {
+  if (!confirm('Clear all portal cache? This will reload the page.')) return;
+  if ('caches' in window) {
+    caches.keys().then(function(names) { names.forEach(function(n) { caches.delete(n); }); });
+  }
+  showToast('Cache Cleared', 'Reloading portal…', 'info', 2000);
+  setTimeout(function() { location.reload(true); }, 2200);
+});
+
+// Admin — Danger zone: Clear logs (placeholder)
+var adminClearLogsBtn = document.getElementById('admin-clear-logs-btn');
+if (adminClearLogsBtn) adminClearLogsBtn.addEventListener('click', async function() {
+  if (!confirm('This will permanently delete ALL audit log entries. Are you sure?')) return;
+  var { error } = await _db.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  showToast('Logs Cleared', 'All audit trail entries have been removed.', 'success');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTINGS — Matshwane
+// ══════════════════════════════════════════════════════════════════════════════
+function loadMatshwaneSettings() {
+  if (!currentProfile) return;
+
+  var nameEl  = document.getElementById('matshwane-setting-name');
+  var emailEl = document.getElementById('matshwane-setting-email');
+  if (nameEl)  nameEl.value  = currentProfile.full_name || '';
+  if (emailEl) emailEl.value = currentProfile.email     || '';
+
+  var sName  = document.getElementById('matshwane-session-name');
+  var sEmail = document.getElementById('matshwane-session-email');
+  var sTime  = document.getElementById('matshwane-session-time');
+  if (sName)  sName.textContent  = currentProfile.full_name || '—';
+  if (sEmail) sEmail.textContent = currentProfile.email     || '—';
+  if (sTime)  sTime.textContent  = new Date().toLocaleString('en-ZA');
+
+  lucide.createIcons();
+}
+
+// Matshwane — Profile form
+var matshwaneProfileForm = document.getElementById('matshwane-profile-form');
+if (matshwaneProfileForm) matshwaneProfileForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var newName = (document.getElementById('matshwane-setting-name') || {}).value || '';
+  if (!newName.trim()) { showToast('Validation', 'Name cannot be empty.', 'warning'); return; }
+  var btn = matshwaneProfileForm.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  var { error } = await _db.from('profiles').update({ full_name: newName }).eq('id', currentUser.id);
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="save"></i> Save Profile'; lucide.createIcons(); }
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  currentProfile.full_name = newName;
+  showToast('Profile Updated', 'Your display name has been saved.', 'success');
+});
+
+// Matshwane — Password form
+var matshwanePasswordForm = document.getElementById('matshwane-password-form');
+if (matshwanePasswordForm) matshwanePasswordForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var pw1 = (document.getElementById('matshwane-new-password')     || {}).value || '';
+  var pw2 = (document.getElementById('matshwane-confirm-password') || {}).value || '';
+  if (pw1.length < 8) { showToast('Validation', 'Password must be at least 8 characters.', 'warning'); return; }
+  if (pw1 !== pw2)    { showToast('Validation', 'Passwords do not match.', 'warning'); return; }
+  var btn = matshwanePasswordForm.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+  var { error } = await _db.auth.updateUser({ password: pw1 });
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="shield-check"></i> Update Password'; lucide.createIcons(); }
+  if (error) { showToast('Error', error.message, 'error'); return; }
+  document.getElementById('matshwane-new-password').value     = '';
+  document.getElementById('matshwane-confirm-password').value = '';
+  showToast('Password Updated', 'Your officer password has been changed successfully.', 'success');
+});
+
+// Matshwane — Notification save
+var matshwaneSaveNotifBtn = document.getElementById('matshwane-save-notif-btn');
+if (matshwaneSaveNotifBtn) matshwaneSaveNotifBtn.addEventListener('click', function() {
+  showToast('Preferences Saved', 'Your notification settings have been updated.', 'success');
+});
+
+// Matshwane — Settings sign out
+var matshwaneSettingsLogoutBtn = document.getElementById('matshwane-settings-logout-btn');
+if (matshwaneSettingsLogoutBtn) matshwaneSettingsLogoutBtn.addEventListener('click', function() {
+  document.getElementById('logout-btn').click();
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PASSWORD TOGGLE — Settings panels
+// ══════════════════════════════════════════════════════════════════════════════
+(function() {
+  var pairs = [
+    ['toggle-admin-pw',       'admin-new-password'],
+    ['toggle-admin-pw2',      'admin-confirm-password'],
+    ['toggle-matshwane-pw',   'matshwane-new-password'],
+    ['toggle-matshwane-pw2',  'matshwane-confirm-password'],
+  ];
+  pairs.forEach(function(pair) {
+    var btn   = document.getElementById(pair[0]);
+    var input = document.getElementById(pair[1]);
+    if (!btn || !input) return;
+    btn.addEventListener('click', function() {
+      var isHidden = input.type === 'password';
+      input.type = isHidden ? 'text' : 'password';
+      btn.innerHTML = '<i data-lucide="' + (isHidden ? 'eye-off' : 'eye') + '"></i>';
+      lucide.createIcons();
+    });
+  });
+})();

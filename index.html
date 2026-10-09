@@ -453,10 +453,10 @@
           <ul class="sidebar-menu">
             <li class="menu-item active" data-tab="admin-users"><i data-lucide="users"></i> Registry</li>
             <li class="menu-item" data-tab="admin-applications"><i data-lucide="file-check"></i> Applications</li>
-            <li class="menu-item" data-tab="admin-apikeys"><i data-lucide="key"></i> API Keys</li>
             <li class="menu-item" data-tab="admin-matching"><i data-lucide="git-pull-request"></i> Mentor Matching</li>
             <li class="menu-item" data-tab="admin-sessions"><i data-lucide="video"></i> Live Overseer</li>
             <li class="menu-item" data-tab="admin-announcements"><i data-lucide="megaphone"></i> Broadcasts</li>
+            <li class="menu-item sidebar-settings-item" data-tab="admin-settings"><i data-lucide="settings"></i> Settings</li>
           </ul>
         </aside>
 
@@ -653,6 +653,187 @@
               </div>
             </div>
           </div>
+
+          <!-- Admin Settings -->
+          <div id="admin-tab-settings" class="subtab-content hidden">
+            <h2 class="page-title">Admin Settings</h2>
+
+            <!-- Settings Grid -->
+            <div class="settings-grid">
+
+              <!-- Profile Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#4f46e5,#7c3aed);">
+                    <i data-lucide="user-circle"></i>
+                  </div>
+                  <div>
+                    <h3>Profile Information</h3>
+                    <p class="text-secondary font-sm">Update your display name and contact details</p>
+                  </div>
+                </div>
+                <form id="admin-profile-form" class="settings-form">
+                  <div class="form-group">
+                    <label for="admin-setting-name">Full Name</label>
+                    <div class="input-wrap">
+                      <i data-lucide="user"></i>
+                      <input type="text" id="admin-setting-name" placeholder="Full Name">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-setting-email">Email Address</label>
+                    <div class="input-wrap">
+                      <i data-lucide="mail"></i>
+                      <input type="email" id="admin-setting-email" placeholder="Email" disabled style="opacity:0.6;cursor:not-allowed;">
+                    </div>
+                  </div>
+                  <button type="submit" class="submit-btn max-w-xs"><i data-lucide="save"></i> Save Profile</button>
+                </form>
+              </div>
+
+              <!-- Password Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#0ea5e9,#0284c7);">
+                    <i data-lucide="lock"></i>
+                  </div>
+                  <div>
+                    <h3>Change Password</h3>
+                    <p class="text-secondary font-sm">Update your portal access credentials</p>
+                  </div>
+                </div>
+                <form id="admin-password-form" class="settings-form">
+                  <div class="form-group">
+                    <label for="admin-new-password">New Password</label>
+                    <div class="input-wrap">
+                      <i data-lucide="lock"></i>
+                      <input type="password" id="admin-new-password" placeholder="Min. 8 characters" style="padding-right:40px;">
+                      <button type="button" class="password-toggle-btn" id="toggle-admin-pw"><i data-lucide="eye"></i></button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-confirm-password">Confirm Password</label>
+                    <div class="input-wrap">
+                      <i data-lucide="lock"></i>
+                      <input type="password" id="admin-confirm-password" placeholder="Repeat new password" style="padding-right:40px;">
+                      <button type="button" class="password-toggle-btn" id="toggle-admin-pw2"><i data-lucide="eye"></i></button>
+                    </div>
+                  </div>
+                  <button type="submit" class="submit-btn max-w-xs"><i data-lucide="shield-check"></i> Update Password</button>
+                </form>
+              </div>
+
+              <!-- API Keys Card (premium) -->
+              <div class="settings-card settings-card-wide">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#f59e0b,#d97706);">
+                    <i data-lucide="key"></i>
+                  </div>
+                  <div>
+                    <h3>API Key Management</h3>
+                    <p class="text-secondary font-sm">Manage integration credentials for third-party system access</p>
+                  </div>
+                  <button class="submit-btn max-w-xs" id="admin-settings-new-key-btn" style="margin-left:auto;">
+                    <i data-lucide="plus"></i> Generate Key
+                  </button>
+                </div>
+                <div class="api-key-generator-box hidden" id="admin-settings-key-box">
+                  <form id="admin-settings-key-form">
+                    <div class="form-group">
+                      <label for="settings-key-name">Integration / App Name</label>
+                      <div class="input-wrap"><i data-lucide="tag"></i><input type="text" id="settings-key-name" required placeholder="e.g. Analytics Dashboard"></div>
+                    </div>
+                    <div class="form-group">
+                      <label>Permissions</label>
+                      <div class="checkbox-group">
+                        <label><input type="checkbox" id="settings-key-read" checked> Read Access</label>
+                        <label><input type="checkbox" id="settings-key-write"> Write / Modify Access</label>
+                        <label><input type="checkbox" id="settings-key-admin"> Admin Commands</label>
+                      </div>
+                    </div>
+                    <div class="btn-group">
+                      <button type="submit" class="submit-btn max-w-xs">Create Key</button>
+                      <button type="button" class="cancel-btn max-w-xs" id="admin-settings-key-cancel">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="table-wrap" style="margin-top:16px;">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>Name</th><th>Created</th><th>Permissions</th><th>Token</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="admin-settings-apikeys-table"><tr><td colspan="6" class="empty-msg">No keys generated yet.</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Notifications Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#10b981,#059669);">
+                    <i data-lucide="bell"></i>
+                  </div>
+                  <div>
+                    <h3>Notification Preferences</h3>
+                    <p class="text-secondary font-sm">Control which alerts you receive</p>
+                  </div>
+                </div>
+                <div class="settings-form">
+                  <div class="toggle-row"><div><strong>New Mentor Applications</strong><p class="font-sm text-secondary">Alert when a new application is submitted</p></div><label class="toggle-switch"><input type="checkbox" id="notif-admin-apps" checked><span class="toggle-slider"></span></label></div>
+                  <div class="toggle-row"><div><strong>Violation Reports</strong><p class="font-sm text-secondary">Alert when Matshwane flags a report</p></div><label class="toggle-switch"><input type="checkbox" id="notif-admin-violations" checked><span class="toggle-slider"></span></label></div>
+                  <div class="toggle-row"><div><strong>System Login Activity</strong><p class="font-sm text-secondary">Alert on unusual sign-in patterns</p></div><label class="toggle-switch"><input type="checkbox" id="notif-admin-login"><span class="toggle-slider"></span></label></div>
+                  <button class="submit-btn max-w-xs" style="margin-top:16px;" id="admin-save-notif-btn"><i data-lucide="save"></i> Save Preferences</button>
+                </div>
+              </div>
+
+              <!-- Session & Security -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed);">
+                    <i data-lucide="shield"></i>
+                  </div>
+                  <div>
+                    <h3>Session &amp; Security</h3>
+                    <p class="text-secondary font-sm">Active session details and security options</p>
+                  </div>
+                </div>
+                <div class="settings-form">
+                  <div class="session-info-box">
+                    <div class="session-row"><i data-lucide="user"></i><span>Logged in as: <strong id="admin-session-name">—</strong></span></div>
+                    <div class="session-row"><i data-lucide="mail"></i><span>Email: <strong id="admin-session-email">—</strong></span></div>
+                    <div class="session-row"><i data-lucide="clock"></i><span>Session started: <strong id="admin-session-time">—</strong></span></div>
+                    <div class="session-row"><i data-lucide="shield-check"></i><span>Role: <strong style="color:var(--color-primary);">SYSTEM ADMINISTRATOR</strong></span></div>
+                  </div>
+                  <button class="cancel-btn max-w-xs" style="margin-top:16px;" id="admin-settings-logout-btn"><i data-lucide="log-out"></i> Sign Out Now</button>
+                </div>
+              </div>
+
+              <!-- Danger Zone -->
+              <div class="settings-card settings-danger-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background: linear-gradient(135deg,#ef4444,#b91c1c);">
+                    <i data-lucide="alert-triangle"></i>
+                  </div>
+                  <div>
+                    <h3 style="color:#ef4444;">Danger Zone</h3>
+                    <p class="text-secondary font-sm">Irreversible system-level actions</p>
+                  </div>
+                </div>
+                <div class="settings-form">
+                  <div class="danger-action-row">
+                    <div><strong>Clear Audit Logs</strong><p class="font-sm text-secondary">Permanently removes all audit trail entries</p></div>
+                    <button class="cancel-btn" id="admin-clear-logs-btn" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;"><i data-lucide="trash-2"></i> Clear Logs</button>
+                  </div>
+                  <div class="danger-action-row">
+                    <div><strong>Reset Portal Cache</strong><p class="font-sm text-secondary">Clears all browser cached portal data</p></div>
+                    <button class="cancel-btn" id="admin-clear-cache-btn" style="background:#fef3c7;color:#92400e;border-color:#fde68a;"><i data-lucide="refresh-cw"></i> Clear Cache</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -669,13 +850,14 @@
             <span class="status-pill matshwane-pill">OVERSIGHT & REGISTRY</span>
           </div>
           <ul class="sidebar-menu">
-            <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="shield-alert"></i> Oversight & Safety</li>
-            <li class="menu-item" data-tab="matshwane-roster"><i data-lucide="user-check"></i> Applications & Roster</li>
+            <li class="menu-item active" data-tab="matshwane-oversight"><i data-lucide="shield-alert"></i> Oversight &amp; Safety</li>
+            <li class="menu-item" data-tab="matshwane-roster"><i data-lucide="user-check"></i> Applications &amp; Roster</li>
             <li class="menu-item" data-tab="matshwane-status"><i data-lucide="activity"></i> Academic Standing</li>
             <li class="menu-item" data-tab="matshwane-education"><i data-lucide="award"></i> Academic Verification</li>
-            <li class="menu-item" data-tab="matshwane-agreements"><i data-lucide="file-signature"></i> Contracts & Compliance</li>
+            <li class="menu-item" data-tab="matshwane-agreements"><i data-lucide="file-signature"></i> Contracts &amp; Compliance</li>
             <li class="menu-item" data-tab="matshwane-announcements"><i data-lucide="megaphone"></i> Directives</li>
             <li class="menu-item" data-tab="matshwane-audits"><i data-lucide="clipboard-list"></i> Audit Logs</li>
+            <li class="menu-item sidebar-settings-item" data-tab="matshwane-settings"><i data-lucide="settings"></i> Settings</li>
           </ul>
         </aside>
 
@@ -894,9 +1076,86 @@
                 </table>
               </div>
             </div>
+          <!-- Matshwane Settings -->
+          <div id="matshwane-tab-settings" class="subtab-content hidden">
+            <h2 class="page-title">Officer Settings</h2>
+            <div class="settings-grid">
+              <!-- Profile Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background:linear-gradient(135deg,#f43f5e,#be123c);"><i data-lucide="user-circle"></i></div>
+                  <div><h3>Officer Profile</h3><p class="text-secondary font-sm">Update your display name and contact details</p></div>
+                </div>
+                <form id="matshwane-profile-form" class="settings-form">
+                  <div class="form-group"><label for="matshwane-setting-name">Full Name</label><div class="input-wrap"><i data-lucide="user"></i><input type="text" id="matshwane-setting-name" placeholder="Officer Full Name"></div></div>
+                  <div class="form-group"><label for="matshwane-setting-email">Email Address</label><div class="input-wrap"><i data-lucide="mail"></i><input type="email" id="matshwane-setting-email" placeholder="Email" disabled style="opacity:0.6;cursor:not-allowed;"></div></div>
+                  <button type="submit" class="submit-btn max-w-xs"><i data-lucide="save"></i> Save Profile</button>
+                </form>
+              </div>
+              <!-- Password Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);"><i data-lucide="lock"></i></div>
+                  <div><h3>Change Password</h3><p class="text-secondary font-sm">Update your officer credentials</p></div>
+                </div>
+                <form id="matshwane-password-form" class="settings-form">
+                  <div class="form-group"><label for="matshwane-new-password">New Password</label><div class="input-wrap"><i data-lucide="lock"></i><input type="password" id="matshwane-new-password" placeholder="Min. 8 characters" style="padding-right:40px;"><button type="button" class="password-toggle-btn" id="toggle-matshwane-pw"><i data-lucide="eye"></i></button></div></div>
+                  <div class="form-group"><label for="matshwane-confirm-password">Confirm Password</label><div class="input-wrap"><i data-lucide="lock"></i><input type="password" id="matshwane-confirm-password" placeholder="Repeat new password" style="padding-right:40px;"><button type="button" class="password-toggle-btn" id="toggle-matshwane-pw2"><i data-lucide="eye"></i></button></div></div>
+                  <button type="submit" class="submit-btn max-w-xs"><i data-lucide="shield-check"></i> Update Password</button>
+                </form>
+              </div>
+              <!-- Notifications -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background:linear-gradient(135deg,#10b981,#059669);"><i data-lucide="bell"></i></div>
+                  <div><h3>Notification Preferences</h3><p class="text-secondary font-sm">Control which officer alerts you receive</p></div>
+                </div>
+                <div class="settings-form">
+                  <div class="toggle-row"><div><strong>New Violation Reports</strong><p class="font-sm text-secondary">Alert when a safety report is filed</p></div><label class="toggle-switch"><input type="checkbox" id="notif-matshwane-violations" checked><span class="toggle-slider"></span></label></div>
+                  <div class="toggle-row"><div><strong>Pending Applications</strong><p class="font-sm text-secondary">Alert on new roster applications awaiting review</p></div><label class="toggle-switch"><input type="checkbox" id="notif-matshwane-apps" checked><span class="toggle-slider"></span></label></div>
+                  <div class="toggle-row"><div><strong>Contract Compliance Flags</strong><p class="font-sm text-secondary">Alert when a mentor contract requires action</p></div><label class="toggle-switch"><input type="checkbox" id="notif-matshwane-contracts"><span class="toggle-slider"></span></label></div>
+                  <button class="submit-btn max-w-xs" style="margin-top:16px;" id="matshwane-save-notif-btn"><i data-lucide="save"></i> Save Preferences</button>
+                </div>
+              </div>
+              <!-- Session Info -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);"><i data-lucide="shield"></i></div>
+                  <div><h3>Session &amp; Security</h3><p class="text-secondary font-sm">Your current officer session details</p></div>
+                </div>
+                <div class="settings-form">
+                  <div class="session-info-box">
+                    <div class="session-row"><i data-lucide="user"></i><span>Logged in as: <strong id="matshwane-session-name">&mdash;</strong></span></div>
+                    <div class="session-row"><i data-lucide="mail"></i><span>Email: <strong id="matshwane-session-email">&mdash;</strong></span></div>
+                    <div class="session-row"><i data-lucide="clock"></i><span>Session started: <strong id="matshwane-session-time">&mdash;</strong></span></div>
+                    <div class="session-row"><i data-lucide="shield-alert"></i><span>Role: <strong style="color:#f43f5e;">MATSHWANE OVERSIGHT OFFICER</strong></span></div>
+                  </div>
+                  <button class="cancel-btn max-w-xs" style="margin-top:16px;" id="matshwane-settings-logout-btn"><i data-lucide="log-out"></i> Sign Out Now</button>
+                </div>
+              </div>
+              <!-- About EIS -->
+              <div class="settings-card settings-card-wide">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon" style="background:linear-gradient(135deg,#64748b,#475569);"><i data-lucide="info"></i></div>
+                  <div><h3>About EIS Matshwane Portal</h3><p class="text-secondary font-sm">System version and officer portal information</p></div>
+                </div>
+                <div class="settings-form">
+                  <div class="about-info-grid">
+                    <div class="about-info-item"><span class="about-label">Portal Version</span><span class="about-value">v5.0.1</span></div>
+                    <div class="about-info-item"><span class="about-label">Module</span><span class="about-value">Matshwane Oversight &amp; Registry</span></div>
+                    <div class="about-info-item"><span class="about-label">System</span><span class="about-value">Educators Intelligence System (EIS)</span></div>
+                    <div class="about-info-item"><span class="about-label">Database</span><span class="about-value">Supabase (PostgreSQL)</span></div>
+                    <div class="about-info-item"><span class="about-label">Last Updated</span><span class="about-value">October 2026</span></div>
+                    <div class="about-info-item"><span class="about-label">Support</span><span class="about-value">admin@eis.ac.za</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
+    </section>
   </main><!-- /.view-container -->
 
   <!-- ═══════════════════════════════════════════════════════
@@ -941,6 +1200,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=5.0.1"></script>
+  <script src="app.js?v=5.1.0"></script>
 </body>
 </html>
