@@ -897,9 +897,28 @@
           </div>
         </div>
       </div>
-    </section>
-
   </main><!-- /.view-container -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL: Application Dossier Preview
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="dossier-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="file-check" style="color:var(--color-primary);"></i>
+          <span>Mentor Application Dossier</span>
+        </div>
+        <button class="modal-close-btn" id="close-dossier-modal">&times;</button>
+      </div>
+      <div class="modal-body" id="dossier-modal-body">
+        <p class="empty-msg">Loading dossier...</p>
+      </div>
+      <div class="modal-footer" id="dossier-modal-footer">
+        <button class="cancel-btn max-w-xs" id="dossier-modal-cancel">Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js?v=5.0.1"></script>
 </body>

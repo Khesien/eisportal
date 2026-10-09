@@ -653,11 +653,13 @@ async function loadMentorApplications() {
       '<div class="app-meta"><strong>Subjects:</strong> ' + escHtml(Array.isArray(app.subjects) ? app.subjects.join(', ') : app.subjects || '—') +
         '<br><strong>Background:</strong> ' + escHtml(app.bio || app.experience_elaboration || '—') + '</div>' +
       '<div class="app-actions">' +
+        '<button class="nav-btn" style="color:var(--color-primary);font-weight:700;" onclick="openApplicationDossierModal(\'' + app.id + '\')"><i data-lucide="eye"></i> Preview Dossier</button>' +
         '<button class="approve-btn" onclick="approveApplication(\'' + app.id + '\',\'' + escAttr(appName) + '\',\'' + escAttr(app.email) + '\')">✓ Approve</button>' +
         '<button class="reject-btn" onclick="rejectApplication(\'' + app.id + '\')">✕ Reject</button>' +
       '</div>';
     list.appendChild(card);
   });
+  lucide.createIcons();
 }
 document.getElementById('admin-refresh-apps-btn').addEventListener('click', loadMentorApplications);
 
@@ -926,11 +928,13 @@ async function loadMatshwaneRoster() {
             '<strong>Background:</strong> ' + escHtml(app.bio || app.experience_elaboration || '—') +
           '</div>' +
           '<div class="app-actions">' +
+            '<button class="nav-btn" style="color:var(--color-primary);font-weight:700;" onclick="openApplicationDossierModal(\'' + app.id + '\')"><i data-lucide="eye"></i> Preview Dossier</button>' +
             '<button class="approve-btn" onclick="approveMatshwaneApp(\'' + app.id + '\', \'' + escAttr(appName) + '\', \'' + escAttr(app.email) + '\')">✓ Approve Mentor</button>' +
             '<button class="reject-btn" onclick="rejectMatshwaneApp(\'' + app.id + '\')">✕ Reject</button>' +
           '</div>';
         appList.appendChild(card);
       });
+      lucide.createIcons();
     }
   }
 
@@ -1522,6 +1526,140 @@ if (refreshStatusBtn) refreshStatusBtn.addEventListener('click', loadMatshwaneSt
 
 var refreshMatshwaneAnnBtn = document.getElementById('matshwane-refresh-announcements-btn');
 if (refreshMatshwaneAnnBtn) refreshMatshwaneAnnBtn.addEventListener('click', loadMatshwaneAnnouncements);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// APPLICATION DOSSIER PREVIEW MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+window.openApplicationDossierModal = async function(appId) {
+  var overlay = document.getElementById('dossier-modal-overlay');
+  var body = document.getElementById('dossier-modal-body');
+  var footer = document.getElementById('dossier-modal-footer');
+  if (!overlay || !body) return;
+
+  overlay.classList.remove('hidden');
+  body.innerHTML = '<p class="empty-msg">Loading application dossier details...</p>';
+
+  var res = await _db.from('mentor_applications').select('*').eq('id', appId).single();
+  if (res.error || !res.data) {
+    body.innerHTML = '<p class="empty-msg">Failed to load application dossier details.</p>';
+    return;
+  }
+
+  var app = res.data;
+  var appName = app.name || ((app.first_name || '') + ' ' + (app.last_name || '')).trim() || 'Applicant';
+  var subjectsText = Array.isArray(app.subjects) ? app.subjects.join(', ') : app.subjects || 'None Specified';
+  var omangFrontLink = app.omang_front_url ? '<a href="' + escAttr(app.omang_front_url) + '" target="_blank" class="download-btn" style="padding:6px 12px;font-size:12px;"><i data-lucide="eye"></i> View Front Omang</a>' : '<span style="color:var(--color-text-muted);">Not Provided</span>';
+  var omangBackLink = app.omang_back_url ? '<a href="' + escAttr(app.omang_back_url) + '" target="_blank" class="download-btn" style="padding:6px 12px;font-size:12px;"><i data-lucide="eye"></i> View Back Omang</a>' : '<span style="color:var(--color-text-muted);">Not Provided</span>';
+
+  var certsHtml = '';
+  var certsList = app.certificates || [];
+  if (typeof certsList === 'string') {
+    try { certsList = JSON.parse(certsList); } catch(e) { certsList = []; }
+  }
+  if (Array.isArray(certsList) && certsList.length > 0) {
+    certsHtml = certsList.map(function(c) {
+      var url = typeof c === 'string' ? c : c.url || c.uri;
+      var cName = typeof c === 'string' ? 'Certificate Document' : c.name || 'Certificate';
+      return '<div style="margin-top:6px;"><a href="' + escAttr(url) + '" target="_blank" style="color:var(--color-primary);font-weight:600;"><i data-lucide="file-text" style="width:14px;height:14px;"></i> ' + escHtml(cName) + '</a></div>';
+    }).join('');
+  } else {
+    certsHtml = '<span style="color:var(--color-text-muted);">No attached certificates.</span>';
+  }
+
+  body.innerHTML =
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Personal & National Identification</div>' +
+      '<div class="dossier-grid">' +
+        '<div class="dossier-item"><span class="dossier-label">Full Name</span><span class="dossier-val">' + escHtml(appName) + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Email Address</span><span class="dossier-val">' + escHtml(app.email || 'N/A') + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">National ID / Omang</span><span class="dossier-val">' + escHtml(app.id_number || 'N/A') + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Phone & Demographics</span><span class="dossier-val">' + escHtml(app.phone || 'N/A') + ' (' + (app.age || 'N/A') + ' yrs, ' + escHtml(app.gender || 'N/A') + ')</span></div>' +
+      '</div>' +
+      '<div style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">' +
+        '<strong>National ID Images:</strong> ' + omangFrontLink + ' ' + omangBackLink +
+      '</div>' +
+    '</div>' +
+
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Teaching Qualifications & Experience</div>' +
+      '<div class="dossier-grid">' +
+        '<div class="dossier-item"><span class="dossier-label">Tertiary Academy</span><span class="dossier-val">' + escHtml(app.academy || app.tertiary_year || 'N/A') + '</span></div>' +
+        '<div class="dossier-item"><span class="dossier-label">Teaching License</span><span class="dossier-val">' + (app.has_license ? escHtml(app.license_number || 'Yes (Licensed)') : 'No License Provided') + '</span></div>' +
+        '<div class="dossier-item" style="grid-column: span 2;"><span class="dossier-label">Subjects Package</span><span class="dossier-val">' + escHtml(subjectsText) + '</span></div>' +
+      '</div>' +
+      '<div style="margin-top:12px;">' +
+        '<span class="dossier-label">Experience Elaboration</span>' +
+        '<div style="margin-top:4px;font-size:13px;line-height:1.6;color:var(--color-text);">' + escHtml(app.experience_elaboration || app.bio || 'None provided.') + '</div>' +
+      '</div>' +
+      '<div style="margin-top:12px;">' +
+        '<span class="dossier-label">Attached Certificates & Credentials</span>' +
+        certsHtml +
+      '</div>' +
+    '</div>' +
+
+    '<div class="dossier-section">' +
+      '<div class="dossier-section-title">Applicant Pitch & Selling Point</div>' +
+      '<div class="dossier-quote-box">"' + escHtml(app.selling_point || app.bio || 'Ready to mentor students to academic excellence.') + '"</div>' +
+    '</div>';
+
+  if (app.status === 'pending') {
+    footer.innerHTML =
+      '<button class="approve-btn" style="padding:9px 18px;" onclick="approveApplicationFromModal(\'' + app.id + '\', \'' + escAttr(appName) + '\', \'' + escAttr(app.email) + '\')">✓ Approve Application</button>' +
+      '<button class="reject-btn" style="padding:9px 18px;" onclick="rejectApplicationFromModal(\'' + app.id + '\')">✕ Reject Application</button>' +
+      '<button class="cancel-btn max-w-xs" onclick="closeDossierModal()">Close</button>';
+  } else {
+    footer.innerHTML =
+      '<span class="status-pill active-pill" style="align-self:center;margin-right:auto;">STATUS: ' + escHtml(app.status.toUpperCase()) + '</span>' +
+      '<button class="cancel-btn max-w-xs" onclick="closeDossierModal()">Close</button>';
+  }
+  lucide.createIcons();
+};
+
+window.closeDossierModal = function() {
+  var overlay = document.getElementById('dossier-modal-overlay');
+  if (overlay) overlay.classList.add('hidden');
+};
+
+var closeBtn = document.getElementById('close-dossier-modal');
+if (closeBtn) closeBtn.addEventListener('click', window.closeDossierModal);
+
+var cancelBtn = document.getElementById('dossier-modal-cancel');
+if (cancelBtn) cancelBtn.addEventListener('click', window.closeDossierModal);
+
+window.approveApplicationFromModal = async function(appId, name, email) {
+  window.closeDossierModal();
+  if (window.approveMatshwaneApp) await window.approveMatshwaneApp(appId, name, email);
+  else if (window.approveApplication) await window.approveApplication(appId, name, email);
+};
+
+window.rejectApplicationFromModal = async function(appId) {
+  window.closeDossierModal();
+  if (window.rejectMatshwaneApp) await window.rejectMatshwaneApp(appId);
+  else if (window.rejectApplication) await window.rejectApplication(appId);
+};
+
+// ── CSV Export Helper ──
+window.exportTableToCSV = function(tableId, filename) {
+  var table = document.getElementById(tableId);
+  if (!table) return;
+  var rows = Array.from(table.querySelectorAll('tr'));
+  var csvContent = rows.map(function(row) {
+    var cols = Array.from(row.querySelectorAll('th, td'));
+    return cols.map(function(col) {
+      var text = col.innerText.replace(/"/g, '""').trim();
+      return '"' + text + '"';
+    }).join(',');
+  }).join('\n');
+
+  var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', (filename || 'export') + '.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Export Successful', filename + '.csv exported.', 'success');
+};
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 lucide.createIcons();
